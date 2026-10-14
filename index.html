@@ -1,0 +1,1902 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Naive Bayes Lab</title>
+<meta name="description" content="Interactive study guide for §9.3–9.4 of Murphy's Probabilistic Machine Learning: naive Bayes classifiers (Bernoulli, categorical and Gaussian), fitting by counting, Laplace smoothing, the link to logistic regression, generative vs discriminative classifiers, and missing features. Explanations at four levels, from elementary school to grad-level ML.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<script>
+window.MathJax = {
+  loader: { load: ['[tex]/html'] },
+  tex: { packages: { '[+]': ['html'] }, inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] },
+  svg: { fontCache: 'global' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js" async></script>
+<style>
+/* Layout: sticky chapter rail + one reading column; every section runs Explain it → Play → Math, slowly → Check yourself */
+:root {
+  --bg: #f3f1ec; --surface: #ffffff; --sunk: #e9e5dc; --ink: #1d1b18; --muted: #5f5a52; --rule: #d9d3c6;
+  --spam: #c0392b; --ham: #1f5fa8; --k3: #1d7a49; --gap: #a35d00; --mi: #6a3fc1; --green: #1d7a49;
+  --spam-soft: rgba(192,57,43,.13); --ham-soft: rgba(31,95,168,.14); --k3-soft: rgba(29,122,73,.14); --gap-soft: rgba(163,93,0,.16); --mi-soft: rgba(106,63,193,.14); --green-soft: rgba(29,122,73,.14);
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12110f; --surface: #1b1a17; --sunk: #25231f; --ink: #ece7de; --muted: #a59e92; --rule: #35322c;
+    --spam: #f0776a; --ham: #6ea8ec; --k3: #52c48a; --gap: #e2a34b; --mi: #b393f2; --green: #52c48a;
+    --spam-soft: rgba(240,119,106,.18); --ham-soft: rgba(110,168,236,.18); --k3-soft: rgba(82,196,138,.16); --gap-soft: rgba(226,163,75,.2); --mi-soft: rgba(179,147,242,.2); --green-soft: rgba(82,196,138,.16);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12110f; --surface: #1b1a17; --sunk: #25231f; --ink: #ece7de; --muted: #a59e92; --rule: #35322c;
+  --spam: #f0776a; --ham: #6ea8ec; --k3: #52c48a; --gap: #e2a34b; --mi: #b393f2; --green: #52c48a;
+  --spam-soft: rgba(240,119,106,.18); --ham-soft: rgba(110,168,236,.18); --k3-soft: rgba(82,196,138,.16); --gap-soft: rgba(226,163,75,.2); --mi-soft: rgba(179,147,242,.2); --green-soft: rgba(82,196,138,.16);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 0 80px; display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 48px; }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; padding-inline: 16px; } .rail { display: none; } }
+
+/* top bar */
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); border-bottom: 1px solid var(--rule); }
+.topbar-in { max-width: 1180px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 14px; }
+.brand { font-family: var(--display); font-weight: 800; font-size: 17px; letter-spacing: -.01em; white-space: nowrap; }
+.brand span { color: var(--mi); }
+.chips { display: none; overflow-x: auto; gap: 6px; flex: 1; min-width: 0; scrollbar-width: none; }
+.chips a { font-family: var(--mono); font-size: 12px; white-space: nowrap; padding: 4px 9px; border: 1px solid var(--rule); border-radius: 99px; color: var(--ink); text-decoration: none; }
+@media (max-width: 900px) { .chips { display: flex; } .topbar-in { padding: 10px 16px; flex-wrap: wrap; row-gap: 8px; } .brand { display: none; } }
+.tb-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.score { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; padding: 5px 10px; border-radius: 99px; background: var(--surface); border: 1px solid var(--rule); }
+.score b { color: var(--green); }
+.lvpick { display: inline-flex; border: 1px solid var(--rule); border-radius: 99px; overflow: hidden; background: var(--surface); }
+.lvpick button { font-family: var(--mono); font-size: 11.5px; padding: 5px 9px; border: 0; background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.lvpick button.on { background: var(--mi); color: #fff; }
+@media (max-width: 900px) { .tb-right { margin-left: 0; width: 100%; justify-content: space-between; } }
+
+/* rail */
+.rail nav { position: sticky; top: 70px; padding-top: 40px; display: flex; flex-direction: column; gap: 2px; }
+.rail a { display: grid; grid-template-columns: 62px 1fr; gap: 4px; padding: 6px 8px; border-radius: 6px; color: var(--muted); text-decoration: none; font-family: var(--display); font-size: 14.5px; line-height: 1.3; }
+.rail a .n { font-family: var(--mono); font-size: 11.5px; padding-top: 2px; }
+.rail a:hover, .rail a.on { color: var(--ink); background: var(--sunk); }
+
+main { min-width: 0; }
+header.hero { padding-block: 48px 28px; border-bottom: 1px solid var(--rule); }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(34px, 5.5vw, 58px); line-height: 1.02; letter-spacing: -.025em; margin: 10px 0 16px; text-wrap: balance; }
+h1 .s { color: var(--spam); } h1 .h { color: var(--ham); } h1 .m { color: var(--mi); }
+.lede { max-width: 66ch; color: var(--muted); font-size: 18px; margin: 0; }
+.levelcards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 24px; }
+@media (max-width: 760px) { .levelcards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.levelcards button { text-align: left; font-family: var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; cursor: pointer; }
+.levelcards button b { display: block; font-family: var(--display); font-size: 17px; }
+.levelcards button span { font-size: 14px; color: var(--muted); line-height: 1.35; display: block; margin-top: 2px; }
+.levelcards button.on { border-color: var(--mi); box-shadow: inset 0 0 0 1.5px var(--mi); background: var(--mi-soft); }
+.legend3 { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 22px; font-family: var(--mono); font-size: 12.5px; }
+.legend3 span { display: inline-flex; align-items: center; gap: 8px; }
+.legend3 i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+section.sec { padding-block: 56px 8px; border-bottom: 1px solid var(--rule); scroll-margin-top: 60px; }
+.sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.secnum { font-family: var(--mono); font-size: 13px; color: var(--mi); border: 1px solid currentColor; border-radius: 4px; padding: 1px 7px; }
+h2 { font-family: var(--display); font-weight: 700; font-size: clamp(26px, 3.4vw, 36px); line-height: 1.1; letter-spacing: -.02em; margin: 0; text-wrap: balance; }
+.intro { max-width: 66ch; }
+.intro p { margin: 12px 0; }
+
+.block { margin-top: 28px; }
+.blabel { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+.blabel::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+.blabel .tag { color: var(--surface); background: var(--ink); padding: 2px 7px; border-radius: 3px; letter-spacing: .06em; }
+.block.math .blabel .tag { background: var(--ham); }
+.block.quiz .blabel .tag { background: var(--green); }
+.block.play .blabel .tag { background: var(--mi); }
+.block.lv .blabel .tag { background: var(--gap); }
+
+/* level explanations */
+.lvcard { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 0; overflow: hidden; }
+.lvtabs { display: flex; border-bottom: 1px solid var(--rule); background: var(--sunk); overflow-x: auto; scrollbar-width: none; }
+.lvtabs button { font-family: var(--mono); font-size: 12px; padding: 9px 14px; border: 0; border-right: 1px solid var(--rule); background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.lvtabs button.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: inset 0 -2px 0 var(--mi); }
+.lvbody { padding: 6px 20px 14px; }
+.lvbody > div { max-width: 68ch; }
+.lvbody p, .lvbody li { margin: 10px 0; }
+.lvbody ul, .lvbody ol { padding-left: 22px; }
+.lvbody .big { font-size: 19px; }
+
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; }
+.panel + .panel { margin-top: 16px; }
+.panel h4 { font-family: var(--display); font-weight: 700; font-size: 18px; margin: 0 0 4px; }
+.hint { font-size: 14.5px; color: var(--muted); margin: 0 0 12px; }
+.two { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.two-even { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+@media (max-width: 760px) { .two, .two-even { grid-template-columns: minmax(0, 1fr); } }
+.cap { font-family: var(--mono); font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+
+svg.plot { width: 100%; height: auto; display: block; overflow: visible; touch-action: none; }
+svg.click { cursor: crosshair; }
+svg:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--mi); outline-offset: 2px; }
+.ax { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+.axl { font-family: var(--mono); font-size: 11.5px; fill: var(--ink); }
+.lbl { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+.grid { stroke: var(--rule); stroke-width: 1; }
+.base { stroke: var(--muted); stroke-width: 1; }
+
+.readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 14px; }
+.stat { background: var(--sunk); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.stat .k { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.stat .v { font-family: var(--display); font-weight: 700; font-size: 23px; font-variant-numeric: tabular-nums; line-height: 1.15; overflow-wrap: anywhere; }
+.stat.s .v { color: var(--spam); } .stat.h .v { color: var(--ham); } .stat.a .v { color: var(--gap); } .stat.g .v { color: var(--green); } .stat.m .v { color: var(--mi); }
+.chain { font-family: var(--mono); font-size: 13px; background: var(--sunk); border-radius: 8px; padding: 10px 14px; margin-top: 12px; line-height: 1.8; overflow-x: auto; }
+.chain .s { color: var(--spam); font-weight: 600; } .chain .h { color: var(--ham); font-weight: 600; } .chain .ok { color: var(--green); font-weight: 600; } .chain .bad { color: var(--spam); font-weight: 600; } .chain .a { color: var(--gap); font-weight: 600; } .chain .mu { color: var(--muted); }
+.warn { color: var(--spam); font-weight: 600; }
+
+.btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+button.b { font-family: var(--mono); font-size: 12.5px; padding: 7px 12px; border-radius: 6px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+button.b:hover:not(:disabled) { border-color: var(--ink); }
+button.b:disabled { opacity: .4; cursor: default; }
+button.b.pri { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.btns .sep { width: 1px; align-self: stretch; background: var(--rule); margin: 0 4px; }
+.btns .lab { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+label.chk { font-family: var(--mono); font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; }
+.seg button { font-family: var(--mono); font-size: 12px; padding: 7px 11px; border: 0; border-right: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--mi); color: #fff; }
+select { font-family: var(--mono); font-size: 12.5px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); }
+
+.ctrl { display: grid; grid-template-columns: 150px minmax(0, 1fr) 64px; align-items: center; gap: 10px; margin: 6px 0; font-family: var(--mono); font-size: 13px; }
+.ctrl label { color: var(--muted); }
+.ctrl output { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) { .ctrl { grid-template-columns: 110px minmax(0, 1fr) 54px; font-size: 12px; } }
+input[type=range] { width: 100%; accent-color: var(--mi); }
+
+/* word chips (emails) */
+.words { display: flex; flex-wrap: wrap; gap: 8px; }
+.word { font-family: var(--mono); font-size: 13.5px; padding: 7px 12px; border-radius: 99px; border: 1.5px dashed var(--rule); background: var(--bg); color: var(--muted); cursor: pointer; text-decoration: line-through; text-decoration-color: var(--muted); }
+.word.on { border-style: solid; border-color: var(--ink); background: var(--surface); color: var(--ink); text-decoration: none; font-weight: 600; }
+.word.unk { border-style: dotted; border-color: var(--gap); color: var(--gap); text-decoration: none; background: var(--gap-soft); }
+.word small { font-weight: 400; color: var(--muted); margin-left: 4px; }
+.email { background: var(--bg); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; }
+.email .hdr { font-family: var(--mono); font-size: 11.5px; color: var(--muted); margin-bottom: 8px; }
+
+/* bars */
+.pbar { display: flex; height: 30px; border-radius: 6px; overflow: hidden; font-family: var(--mono); font-size: 12px; font-weight: 600; color: #fff; margin-top: 6px; }
+.pbar > div { display: flex; align-items: center; padding: 0 8px; white-space: nowrap; overflow: hidden; transition: flex-basis .25s; min-width: 0; }
+@media (prefers-reduced-motion: reduce) { .pbar > div { transition: none; } }
+.pbar .s { background: var(--spam); } .pbar .h { background: var(--ham); justify-content: flex-end; }
+
+table.t { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+table.t th, table.t td { padding: 5px 8px; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap; }
+table.t th:first-child, table.t td:first-child { text-align: left; }
+table.t th { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+table.t td.s { color: var(--spam); font-weight: 600; } table.t td.h { color: var(--ham); font-weight: 600; } table.t td.a { color: var(--gap); font-weight: 600; } table.t td.mu { color: var(--muted); }
+table.t tr.tot td { border-top: 2px solid var(--rule); font-weight: 600; }
+.scroll { overflow-x: auto; }
+table.data td.cell { text-align: center; cursor: pointer; user-select: none; width: 44px; }
+table.data td.cell.on { background: var(--sunk); font-weight: 600; }
+table.data td.lab { cursor: pointer; font-weight: 600; user-select: none; }
+table.data td.lab.s { color: var(--spam); } table.data td.lab.h { color: var(--ham); }
+table.data tr:hover td { background: var(--mi-soft); }
+
+/* digits */
+.digits { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 600px) { .digits { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.digits figure { margin: 0; text-align: center; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.digits figure.off { opacity: .25; }
+.digits svg { width: 100%; height: auto; display: block; border-radius: 4px; }
+.cls { display: flex; flex-wrap: wrap; gap: 6px; }
+.cls button { font-family: var(--mono); font-size: 12.5px; width: 34px; padding: 5px 0; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--muted); cursor: pointer; text-decoration: line-through; }
+.cls button.on { color: var(--ink); border-color: var(--ink); text-decoration: none; font-weight: 600; }
+.postbars { display: grid; gap: 4px; font-family: var(--mono); font-size: 12px; }
+.postbars .r { display: grid; grid-template-columns: 22px minmax(0, 1fr) 54px; gap: 8px; align-items: center; }
+.postbars .bar { height: 14px; background: var(--sunk); border-radius: 3px; overflow: hidden; }
+.postbars .bar i { display: block; height: 100%; background: var(--mi); }
+.postbars .r.top .bar i { background: var(--green); }
+.postbars .r.off { opacity: .3; }
+.postbars .v { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* scenario sorter */
+.scen { display: grid; gap: 10px; }
+.sc { background: var(--bg); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 14px; }
+.sc p { margin: 0 0 8px; }
+.sc .why-ans { margin-top: 8px; }
+
+/* math */
+.mathcard { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 6px 20px 16px; }
+.mathcard + .mathcard { margin-top: 16px; }
+.mathcard h4 { font-family: var(--display); font-weight: 700; font-size: 18px; margin: 16px 0 4px; }
+.mathcard p, .mathcard li { max-width: 68ch; }
+.eq { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+mjx-container[display="true"] { overflow-x: auto; overflow-y: hidden; max-width: 100%; margin: 10px 0 !important; padding: 2px 0; }
+.ts { color: var(--spam); } .th { color: var(--ham); } .ta { color: var(--gap); } .tg { color: var(--green); } .tm { color: var(--mi); }
+.steps { counter-reset: st; list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 4px; }
+.steps > li { counter-increment: st; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-top: 1px dashed var(--rule); }
+.steps > li::before { content: counter(st); font-family: var(--mono); font-size: 12px; color: var(--surface); background: var(--ham); border-radius: 50%; width: 22px; height: 22px; display: grid; place-items: center; margin-top: 4px; }
+.steps .why { color: var(--muted); font-size: 15px; }
+.steps > li > div { min-width: 0; }
+.steps > li > div, .lvbody p, .lvbody li, .mathcard p { overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
+.note { border-left: 3px solid var(--gap); padding: 6px 14px; margin: 14px 0; font-size: 15.5px; background: var(--sunk); border-radius: 0 6px 6px 0; }
+
+/* quiz */
+.quizbox { display: grid; gap: 14px; }
+.qq { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; }
+.qq .qt { font-weight: 600; margin: 0 0 10px; }
+.qq .qt .qn { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-right: 8px; font-weight: 400; }
+.qq .qt .ql { font-family: var(--mono); font-size: 11px; color: var(--gap); border: 1px solid currentColor; border-radius: 3px; padding: 0 5px; margin-left: 8px; font-weight: 400; white-space: nowrap; }
+.opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 600px) { .opts { grid-template-columns: minmax(0, 1fr); } }
+.opt { text-align: left; font-family: var(--body); font-size: 15.5px; line-height: 1.4; padding: 9px 12px; border-radius: 7px; border: 1px solid var(--rule); background: var(--bg); color: var(--ink); cursor: pointer; }
+.opt:hover:not(:disabled) { border-color: var(--ink); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--green); background: var(--green-soft); }
+.opt.wrong { border-color: var(--spam); background: var(--spam-soft); }
+.why-ans { margin: 10px 0 0; font-size: 15px; padding: 8px 12px; border-radius: 6px; background: var(--sunk); }
+.why-ans b.ok { color: var(--green); } .why-ans b.no { color: var(--spam); }
+.quizfoot { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 12.5px; color: var(--muted); gap: 10px; flex-wrap: wrap; }
+
+table.vs { border-collapse: collapse; width: 100%; font-size: 15px; }
+table.vs th, table.vs td { padding: 9px 10px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+table.vs thead th { font-family: var(--display); font-size: 16px; }
+table.vs tbody th { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--muted); white-space: nowrap; }
+
+footer { padding-block: 32px; color: var(--muted); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="topbar-in">
+  <div class="brand">Naive <span>Bayes</span> Lab</div>
+  <div class="chips">
+    <a href="#nb">9.3</a><a href="#models">9.3.1</a><a href="#fit">9.3.2</a><a href="#bayes">9.3.3</a><a href="#lr">9.3.4</a><a href="#gvd">9.4.1</a><a href="#gen">9.4.2</a><a href="#missing">9.4.3</a><a href="#cheat">Sheet</a>
+  </div>
+  <div class="tb-right">
+    <div class="lvpick" id="lvpick" role="group" aria-label="Explanation level">
+      <button data-setl="1">Kid</button><button data-setl="2">High school</button><button data-setl="3">Undergrad</button><button data-setl="4">Grad</button>
+    </div>
+    <div class="score" id="score">Quiz <b>0</b> / 0</div>
+  </div>
+</div></div>
+
+<div class="wrap">
+<aside class="rail"><nav id="rail">
+  <a href="#nb"><span class="n">9.3</span>The naive Bayes assumption</a>
+  <a href="#models"><span class="n">9.3.1</span>Example models</a>
+  <a href="#fit"><span class="n">9.3.2</span>Model fitting (counting)</a>
+  <a href="#bayes"><span class="n">9.3.3</span>Bayesian naive Bayes</a>
+  <a href="#lr"><span class="n">9.3.4</span>NB and logistic regression</a>
+  <a href="#gvd"><span class="n">9.4–9.4.1</span>Generative vs discriminative</a>
+  <a href="#gen"><span class="n">9.4.2</span>When generative wins</a>
+  <a href="#missing"><span class="n">9.4.3</span>Missing features</a>
+  <a href="#cheat"><span class="n">—</span>Cheat sheet</a>
+</nav></aside>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">Murphy, <i>Probabilistic Machine Learning</i> · Chapter 9 · §9.3–9.4</div>
+  <h1>Treat every clue as if it were <span class="m">independent</span>. It's usually false, and it works anyway.</h1>
+  <p class="lede">A naive Bayes classifier asks, for each class, "how likely is each feature on its own?" and multiplies the answers. Fitting it is just counting. It turns out to be a close cousin of logistic regression, and it's the standard example of a <b>generative</b> classifier, one that models how the data were made rather than only where the boundary goes. Every section has four parts: <b>Explain it</b> at your level, <b>Play</b>, <b>Math, slowly</b>, and <b>Check yourself</b>. Your quiz score sits in the top bar.</p>
+  <div class="levelcards" id="levelcards">
+    <button data-setl="1"><b>Kid</b><span>Elementary school. Stories, no symbols.</span></button>
+    <button data-setl="2"><b>High school</b><span>Fractions, percentages, a little probability.</span></button>
+    <button data-setl="3"><b>Undergrad</b><span>Bayes' rule, logs, MLE, the book's equations.</span></button>
+    <button data-setl="4"><b>Grad / MLE</b><span>Exponential families, asymptotics, practice.</span></button>
+  </div>
+  <p class="hint" style="margin-top:10px">Pick a level here or in the top bar. Every "Explain it" box switches to match, and you can still flip tabs one box at a time.</p>
+  <div class="legend3">
+    <span><i style="background:var(--spam)"></i>spam / class 1</span>
+    <span><i style="background:var(--ham)"></i>ham (not spam) / class 2</span>
+    <span><i style="background:var(--k3)"></i>class 3</span>
+    <span><i style="background:var(--gap)"></i>missing or smoothed</span>
+  </div>
+</header>
+
+<!-- ============ 9.3 NB assumption ============ -->
+<section class="sec" id="nb">
+  <div class="sec-head"><span class="secnum">§9.3</span><h2>The naive Bayes assumption: score each clue on its own, then multiply</h2></div>
+  <div class="intro">
+    <p>A <b>generative classifier</b> learns two things: how common each class is, \(p(y=c)\), and what inputs from each class look like, \(p(\mathbf x\mid y=c)\). Bayes' rule then flips them into \(p(y=c\mid\mathbf x)\). The hard part is \(p(\mathbf x\mid y)\) when \(\mathbf x\) has many features. Naive Bayes makes it easy by assuming the features are <b>independent once you know the class</b>.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">You're a detective sorting letters into two boxes: <b style="color:var(--spam)">junk</b> and <b style="color:var(--ham)">real letters from friends</b>.</p>
+        <p>You've learned some clues. The word "FREE" shows up in most junk letters but hardly ever in letters from friends. The word "lunch" is the other way around.</p>
+        <p>When a new letter arrives, you look at each clue <b>one at a time</b> and ask: "Does this clue point toward junk or toward friends? How strongly?" Then you add up all the hints.</p>
+        <p>The "naive" part: you pretend the clues have nothing to do with each other. In real life, "FREE" and "money" often show up together, so you might count the same hint twice. Detectives who do this are a bit too sure of themselves. They still pick the right box most of the time.</p>
+      </div>
+      <div data-l="2">
+        <p>Suppose 5 of your 12 saved emails are spam. Before reading a new email, the chance it's spam is 5/12. That's the <b>prior</b>.</p>
+        <p>Now the email contains "free". In spam, "free" shows up in about 4 out of 5 emails. In normal email, about 1 out of 7. Bayes' rule says: multiply the prior by how likely that word is in each class, then rescale so the two answers add to 1.</p>
+        <p>With several words, naive Bayes just keeps multiplying: prior × P(word 1 | class) × P(word 2 | class) × … It treats the words like independent coin flips <i>within each class</i>. That's the naive Bayes assumption.</p>
+        <p>Why not track how words go together? With 6 words there are \(2^6 = 64\) possible on/off patterns per class, and with 10,000 words there are more patterns than atoms in the universe. Naive Bayes needs one number per word per class.</p>
+      </div>
+      <div data-l="3">
+        <p>The assumption is <b>conditional independence</b> given the class (Eq. 9.46):</p>
+        <p>\(p(\mathbf x\mid y=c,\boldsymbol\theta)=\prod_{d=1}^D p(x_d\mid y=c,\theta_{dc})\).</p>
+        <p>Plug into Bayes' rule and you get Eq. 9.47. The denominator is the same sum over classes for every \(c\), so for classification you only need the numerators. In practice you work in logs: \(\log\pi_c+\sum_d\log p(x_d\mid\theta_{dc})\). Each feature adds its own vote.</p>
+        <p>Note what's <i>not</i> assumed: features need not be independent marginally. "free" and "winner" are strongly correlated overall, because both are common in spam. NB only says that <i>within</i> spam, knowing one tells you nothing extra about the other.</p>
+        <p>Parameter count: \(O(CD)\), against \(O(C\,2^D)\) for a full joint over binary features. Few parameters means low variance and little overfitting, which is a big reason NB works well even when the assumption is wrong.</p>
+      </div>
+      <div data-l="4">
+        <p>NB is a generative model with a fully factorized class-conditional, i.e. the graphical model \(y\to x_d\) for every \(d\) with no edges among the \(x_d\). The resulting posterior log-odds are <b>additive</b> in per-feature terms: \(\log\frac{p(y=1\mid\mathbf x)}{p(y=0\mid\mathbf x)}=\log\frac{\pi_1}{\pi_0}+\sum_d\log\frac{p(x_d\mid 1)}{p(x_d\mid 0)}\). That is a generalized additive model, and linear in sufficient statistics for exponential-family features (§9.3.4).</p>
+        <ul>
+          <li><b>Why it works when wrong</b> (Domingos &amp; Pazzani 1997): 0-1 loss only needs the <i>argmax</i> to be right. Correlated evidence inflates the log-odds magnitude but often preserves its sign, so NB's ranking survives while its probabilities are badly miscalibrated.</li>
+          <li><b>Bias–variance:</b> the \(O(CD)\) parameterization has high bias but very low variance. Ng &amp; Jordan (2002) show NB approaches its (worse) asymptotic error with \(O(\log D)\) examples, versus \(O(D)\) for logistic regression.</li>
+          <li><b>Practice:</b> multinomial NB on TF-IDF counts is still a strong text baseline, especially with complement NB (Rennie et al. 2003) for class imbalance.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>A six-word spam filter, factor by factor</h3>
+    <div class="panel">
+      <p class="hint">The model is trained on the 12 emails in <a href="#fit">§9.3.2</a> (with add-one smoothing from <a href="#bayes">§9.3.3</a>), so editing that table changes this filter. <b>Click words</b> to put them in or take them out of the email. Each class gets a score: its prior times one factor per word. A word that's <i>present</i> contributes \(\theta\); a word that's <i>absent</i> contributes \(1-\theta\). Absent words carry evidence too.</p>
+      <div class="email"><div class="hdr">New email · words in it (crossed out = not in it)</div><div class="words" id="nb-words"></div></div>
+      <div class="scroll" style="margin-top:14px"><table class="t" id="nb-table"></table></div>
+      <p class="cap" style="margin-top:14px">posterior p(y | x): the two scores rescaled to add up to 1</p>
+      <div class="pbar" id="nb-bar"></div>
+      <p class="cap" style="margin-top:16px">the same thing as a ledger of votes: each factor's log-ratio log[p(·|spam) / p(·|ham)]. Right = toward spam.</p>
+      <svg class="plot" id="nb-ledger" viewBox="0 0 640 230" aria-label="Log-odds contribution of the prior and each word"></svg>
+      <div class="btns"><span class="lab">try:</span>
+        <button class="b" data-nbx="1,1,1,1,0,0">Classic spam</button>
+        <button class="b" data-nbx="0,0,0,0,1,1">Lunch meeting</button>
+        <button class="b" data-nbx="1,0,0,0,0,1">"Free lunch!"</button>
+        <button class="b" data-nbx="0,0,0,0,0,0">Empty email</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equations 9.46 – 9.47</h3>
+    <div class="mathcard">
+      <h4>Start from Bayes' rule</h4>
+      <div class="eq">\[ p(y=c\mid\mathbf x,\boldsymbol\theta)=\frac{p(y=c\mid\boldsymbol\pi)\;p(\mathbf x\mid y=c,\boldsymbol\theta)}{\sum_{c'}p(y=c'\mid\boldsymbol\pi)\;p(\mathbf x\mid y=c',\boldsymbol\theta)} \]</div>
+      <p>The numerator is "prior × class-conditional density." The denominator just makes the answers add to 1.</p>
+      <h4>Make the naive assumption</h4>
+      <div class="eq">\[ p(\mathbf x\mid y=c,\boldsymbol\theta)=\prod_{d=1}^{D}p(x_d\mid y=c,\theta_{dc}) \tag{9.46} \]</div>
+      <ol class="steps">
+        <li><div>The exact chain rule is \(p(x_1,\dots,x_D\mid c)=p(x_1\mid c)\,p(x_2\mid x_1,c)\,p(x_3\mid x_1,x_2,c)\cdots\). <span class="why">Always true, but each factor depends on everything before it, so it needs a huge table.</span></div></li>
+        <li><div>Naive Bayes drops every "given the other features" part: \(p(x_d\mid x_{1:d-1},c)\approx p(x_d\mid c)\). <span class="why">This is the assumption. Once you know the class, the other features don't change your belief about \(x_d\).</span></div></li>
+        <li><div>Each factor has its own small parameter \(\theta_{dc}\), one per feature per class. <span class="why">For a binary word, \(\theta_{dc}\) is the chance that word \(d\) appears in an email of class \(c\).</span></div></li>
+      </ol>
+      <h4>Put it together</h4>
+      <div class="eq">\[ p(y=c\mid\mathbf x,\boldsymbol\theta)=\frac{\pi_c\prod_{d=1}^{D}p(x_d\mid y=c,\theta_{dc})}{\sum_{c'}\pi_{c'}\prod_{d=1}^{D}p(x_d\mid y=c',\theta_{dc'})} \tag{9.47} \]</div>
+      <p>In logs the product becomes a sum, which is what the ledger in the Play box shows (here for two classes):</p>
+      <div class="eq">\[ \log\frac{p(\class{ts}{\text{spam}}\mid\mathbf x)}{p(\class{th}{\text{ham}}\mid\mathbf x)}=\underbrace{\log\frac{\pi_{\text{spam}}}{\pi_{\text{ham}}}}_{\text{prior vote}}+\sum_{d=1}^D\underbrace{\log\frac{p(x_d\mid\class{ts}{\text{spam}})}{p(x_d\mid\class{th}{\text{ham}})}}_{\text{word }d\text{'s vote}} \]</div>
+      <h4>Why "only \(O(CD)\) parameters" matters</h4>
+      <p>With \(D\) binary features, a full table of \(p(\mathbf x\mid c)\) needs \(2^D-1\) numbers per class. Naive Bayes needs \(D\).</p>
+      <div class="scroll"><table class="t" style="max-width:520px"><thead><tr><th>D (words)</th><th>full joint, 2 classes</th><th>naive Bayes, 2 classes</th></tr></thead><tbody>
+        <tr><td>6</td><td>126</td><td>12</td></tr><tr><td>30</td><td>2,147,483,646</td><td>60</td></tr><tr><td>10,000</td><td>≈ 4 × 10<sup>3010</sup></td><td>20,000</td></tr></tbody></table></div>
+      <div class="note">Plus \(C-1\) numbers for the prior \(\boldsymbol\pi\) in both cases. Fewer parameters means each one is estimated from lots of data, so the model is "relatively immune to overfitting."</div>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>The naive Bayes assumption</h3><div class="quizbox" data-quiz="nb"></div></div>
+</section>
+
+<!-- ============ 9.3.1 Example models ============ -->
+<section class="sec" id="models">
+  <div class="sec-head"><span class="secnum">§9.3.1</span><h2>Example models: pick a one-feature distribution to match each feature type</h2></div>
+  <div class="intro">
+    <p>Eq. 9.46 leaves open what each \(p(x_d\mid y=c,\theta_{dc})\) looks like. You pick the simplest distribution that fits the feature: <b>Bernoulli</b> for on/off, <b>categorical</b> for one-of-K, <b>Gaussian</b> for real numbers. You can even mix types in one model.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">Different clues need different kinds of notes.</p>
+        <p>For a <b>yes/no</b> clue like "is this square of the picture colored in?", you write down how often it's yes for each kind of thing. For a <b>pick-one</b> clue like "what color is the fruit?", you write how often each color shows up. For a <b>measuring</b> clue like "how long is it?", you write down the usual size and how much it wiggles around.</p>
+        <p>To read a handwritten number, the computer looks at every little square. It has learned "for a 1, this middle column is usually colored." It checks each square, one by one, and picks the number that fits best.</p>
+      </div>
+      <div data-l="2">
+        <ul>
+          <li><b>Bernoulli</b> (yes/no): one number per feature per class, the chance it's "on." In the digits demo, each pixel of each digit class has its own chance of being black. Those chances, drawn as pictures, look like blurry digits (Figure 9.6).</li>
+          <li><b>Categorical</b> (one of K choices): K numbers per feature per class that add to 1, like "apples are red 70%, green 25%, yellow 5%."</li>
+          <li><b>Gaussian</b> (real number): a bell curve per feature per class, with a mean and a spread. Because NB treats features separately, each class's bell-shaped "cloud" in 2-D is lined up with the axes: it can be wide or tall, but never tilted.</li>
+        </ul>
+      </div>
+      <div data-l="3">
+        <ul>
+          <li><b>Bernoulli NB:</b> \(p(\mathbf x\mid c)=\prod_d\theta_{dc}^{x_d}(1-\theta_{dc})^{1-x_d}\). On binarized MNIST this gets 84.3% test accuracy with no notion that neighboring pixels are related. The 7×9 mini-digits here behave the same way.</li>
+          <li><b>Categorical NB:</b> \(p(\mathbf x\mid c)=\prod_d\prod_k\theta_{dck}^{\mathbb I(x_d=k)}\).</li>
+          <li><b>Gaussian NB:</b> \(p(\mathbf x\mid c)=\prod_d\mathcal N(x_d\mid\mu_{dc},\sigma^2_{dc})=\mathcal N(\mathbf x\mid\boldsymbol\mu_c,\operatorname{diag}(\boldsymbol\sigma^2_c))\). This is <b>GDA/QDA with diagonal covariance</b>. Boundaries are still quadratic, but the class ellipses are axis-aligned. Turn up the correlation in the Gaussian tab to see where that hurts.</li>
+        </ul>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li>Any per-feature exponential family works: Poisson for counts, multinomial for bag-of-words (the "multinomial event model," McCallum &amp; Nigam 1998, usually beats multivariate Bernoulli on long documents), von Mises for angles, KDE for nonparametric features ("flexible Bayes").</li>
+          <li>Bernoulli NB scores absent words (\(1-\theta\)); multinomial NB ignores them. With big vocabularies the Bernoulli event model is dominated by thousands of absent-word factors.</li>
+          <li>Gaussian NB versus GDA: both are \(O(CD)\) for means, but diagonal \(\Sigma_c\) costs \(O(CD)\) instead of \(O(CD^2)\), and it's always invertible. It's the natural shrinkage endpoint of regularized discriminant analysis (Friedman 1989).</li>
+          <li>Relaxations: TAN (tree-augmented NB), AODE, and semi-naive Bayes add a few dependencies back for a modest variance cost.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Three feature types</h3>
+    <div class="panel">
+      <div class="seg" id="mt-seg" role="tablist"><button data-mt="ber" class="on">Bernoulli: mini-digits</button><button data-mt="cat">Categorical: fruit</button><button data-mt="gau">Gaussian: 2-D clouds</button></div>
+
+      <div data-mtp="ber" style="margin-top:16px">
+        <p class="hint">Like Figure 9.6, but on 7×9 pixel digits. Each class was trained on 60 noisy, jittered examples. Each picture below shows \(\theta_{dc}\), the chance that pixel \(d\) is black for digit \(c\). <b>Draw on the grid</b> (click or drag), or pull a random test image, and watch the posterior. Click a class number below to remove it from the model: the other classes' pictures don't change, because NB fits every class separately.</p>
+        <div class="digits" id="dg-thetas"></div>
+        <div class="btns"><span class="lab">classes in model:</span><div class="cls" id="dg-cls"></div></div>
+        <div class="two" style="margin-top:16px">
+          <div>
+            <p class="cap">your image (click or drag to paint pixels)</p>
+            <svg class="plot" id="dg-draw" viewBox="0 0 140 180" style="max-width:240px;cursor:pointer" aria-label="7 by 9 pixel drawing grid"></svg>
+            <div class="btns">
+              <button class="b pri" id="dg-rand">Random test digit</button>
+              <button class="b" id="dg-clear">Clear</button>
+            </div>
+            <p class="cap" id="dg-true" style="margin-top:8px"></p>
+          </div>
+          <div>
+            <p class="cap">posterior p(y = c | x)</p>
+            <div class="postbars" id="dg-post"></div>
+            <p class="cap" style="margin-top:14px" id="dg-whycap">why: each pixel's vote, top class vs runner-up</p>
+            <svg class="plot" id="dg-why" viewBox="0 0 140 180" style="max-width:200px" aria-label="Per-pixel log-odds between the top two classes"></svg>
+          </div>
+        </div>
+        <div class="readout">
+          <div class="stat g"><div class="k">test accuracy (500 images)</div><div class="v" id="dg-acc"></div></div>
+          <div class="stat"><div class="k">parameters</div><div class="v" id="dg-np"></div></div>
+          <div class="stat m"><div class="k">top class</div><div class="v" id="dg-top"></div></div>
+        </div>
+        <p class="cap" style="margin-top:14px">sample test predictions (like Figure 9.7). Red = wrong.</p>
+        <div class="digits" id="dg-samples"></div>
+      </div>
+
+      <div data-mtp="cat" hidden style="margin-top:16px">
+        <p class="hint">Three features, each one of K values. Each class has its own table \(\theta_{dck}=p(x_d=k\mid y=c)\), shown as bars (each row sums to 1). Pick the features of a mystery fruit.</p>
+        <div class="btns" id="ct-sel"></div>
+        <div class="scroll" style="margin-top:12px"><table class="t" id="ct-table"></table></div>
+        <div class="readout" id="ct-post"></div>
+      </div>
+
+      <div data-mtp="gau" hidden style="margin-top:16px">
+        <p class="hint">Three classes of 2-D points. Gaussian NB fits a mean and a variance <i>per feature per class</i>, so its 1σ and 2σ ellipses are axis-aligned. Background color shows which class wins. Raise the <b>true correlation</b> to tilt the real clouds: NB can't tilt its ellipses, but a full-covariance model (QDA, §9.2) can. <b>Click the plot</b> to drop a test point.</p>
+        <svg class="plot click" id="gn-plot" viewBox="0 0 520 400" aria-label="2-D data with Gaussian naive Bayes decision regions. Click to place a test point."></svg>
+        <div class="ctrl"><label for="gn-rho">true correlation ρ</label><input type="range" id="gn-rho" min="-0.9" max="0.9" step="0.05" value="0"><output id="gn-rho-o"></output></div>
+        <div class="btns"><span class="lab">fit:</span><div class="seg" id="gn-seg"><button data-gm="nb" class="on">diagonal (naive Bayes)</button><button data-gm="full">full covariance (QDA)</button></div><button class="b" id="gn-new">New sample</button></div>
+        <div class="readout" id="gn-read"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>The three class-conditional families</h3>
+    <div class="mathcard">
+      <h4>Binary features: multivariate Bernoulli NB</h4>
+      <div class="eq">\[ p(\mathbf x\mid y=c,\boldsymbol\theta)=\prod_{d=1}^D\mathrm{Ber}(x_d\mid\theta_{dc})=\prod_{d=1}^D\theta_{dc}^{\,x_d}\,(1-\theta_{dc})^{1-x_d} \]</div>
+      <p>The exponent trick: if \(x_d=1\) the factor is \(\theta_{dc}\); if \(x_d=0\) it's \(1-\theta_{dc}\). Taking logs,</p>
+      <div class="eq">\[ \log p(\mathbf x\mid c)=\sum_d\big[x_d\log\theta_{dc}+(1-x_d)\log(1-\theta_{dc})\big] \]</div>
+      <p>The digits demo sums this over all 63 pixels for each class. The "why" picture shows, pixel by pixel, the difference of this sum's terms between the top two classes.</p>
+      <h4>Categorical features</h4>
+      <div class="eq">\[ p(\mathbf x\mid y=c,\boldsymbol\theta)=\prod_{d=1}^D\mathrm{Cat}(x_d\mid\boldsymbol\theta_{dc})=\prod_{d=1}^D\prod_{k=1}^K\theta_{dck}^{\,\mathbb I(x_d=k)} \]</div>
+      <p>The indicator \(\mathbb I(x_d=k)\) is 1 for the value you saw and 0 for the others, so it picks out one entry per feature. Bernoulli is the \(K=2\) case.</p>
+      <h4>Real-valued features: Gaussian NB</h4>
+      <div class="eq">\[ p(\mathbf x\mid y=c,\boldsymbol\theta)=\prod_{d=1}^D\mathcal N(x_d\mid\mu_{dc},\sigma^2_{dc})=\mathcal N\!\big(\mathbf x\,\big|\,\boldsymbol\mu_c,\;\operatorname{diag}(\sigma^2_{1c},\dots,\sigma^2_{Dc})\big) \]</div>
+      <ol class="steps">
+        <li><div>A multivariate Gaussian with a <b>diagonal</b> covariance has zero correlation between coordinates. <span class="why">For Gaussians, zero correlation means independence, so the density factors into 1-D bells.</span></div></li>
+        <li><div>So Gaussian NB = Gaussian discriminant analysis (§9.2) restricted to diagonal \(\Sigma_c\). <span class="why">Each class's ellipse can stretch along \(x_1\) or \(x_2\) but can't rotate.</span></div></li>
+        <li><div>Different \(\sigma^2_{dc}\) per class give a <b>quadratic</b> boundary; equal ones give a <b>linear</b> one. <span class="why">The \(x_d^2\) terms cancel only when the variances match (see §9.3.4).</span></div></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Example models</h3><div class="quizbox" data-quiz="models"></div></div>
+</section>
+
+<!-- ============ 9.3.2 Fitting ============ -->
+<section class="sec" id="fit">
+  <div class="sec-head"><span class="secnum">§9.3.2</span><h2>Model fitting: the maximum likelihood estimate is just counting</h2></div>
+  <div class="intro">
+    <p>The log-likelihood splits into one piece for the class prior and one separate piece for each (feature, class) pair. Each piece has a one-line closed-form answer. No gradient descent, no iterations: count, divide, done.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">How does the detective learn the clues? By counting.</p>
+        <p>Take all the junk letters you've saved. In how many does "FREE" appear? If it's 4 out of 5, write down "FREE: 4 out of 5 junk letters." Do the same for every word, and then do the same for the letters from friends.</p>
+        <p>That's all the "learning" there is. No guessing and checking, just tally marks.</p>
+      </div>
+      <div data-l="2">
+        <p>Every number in the model is a fraction you can count off the table:</p>
+        <ul>
+          <li><b>Prior:</b> (number of spam emails) ÷ (all emails). 5 ÷ 12 ≈ 0.42.</li>
+          <li><b>Word chance:</b> (spam emails containing "free") ÷ (spam emails). 4 ÷ 5 = 0.8.</li>
+          <li><b>Gaussian feature:</b> the average of that feature over a class's examples, and the average squared distance from that average (the variance).</li>
+        </ul>
+        <p>Watch out for zeros: "meeting" never appears in our spam, so the count says the chance is 0 ÷ 5 = 0. One "meeting" in a spam email would then make spam <i>impossible</i>, no matter what else it says. §9.3.3 fixes that.</p>
+      </div>
+      <div data-l="3">
+        <p>Writing the likelihood with indicators \(\mathbb I(y_n=c)\) lets the log turn the double product into a double sum that <b>decouples</b> (Eq. 9.50–9.51): one term depends only on \(\boldsymbol\pi\), and each of the \(CD\) terms depends only on its own \(\theta_{dc}\) and only on the data \(\mathcal D_{dc}=\{x_{nd}:y_n=c\}\).</p>
+        <p>So you maximize each term separately, and each is a textbook MLE: \(\hat\pi_c=N_c/N\) (categorical, with a Lagrange multiplier for \(\sum_c\pi_c=1\)); \(\hat\theta_{dck}=N_{dck}/N_c\); \(\hat\theta_{dc}=N_{dc}/N_c\) for Bernoulli; sample mean and (biased, divide-by-\(N_c\)) variance for Gaussian.</p>
+        <p>Cost: one pass through the data, \(O(ND)\).</p>
+      </div>
+      <div data-l="4">
+        <p>The decomposition is a consequence of the joint likelihood factoring over a directed graphical model with fully observed nodes: each CPD's parameters are global-independent, so the MLE is a set of local MLEs given sufficient statistics \(\{N_c, N_{dck}\}\) (or \(\sum x, \sum x^2\) per class).</p>
+        <ul>
+          <li><b>Streaming / distributed:</b> sufficient statistics are additive, so training is a map-reduce over counts, and online updates are exact.</li>
+          <li><b>Degeneracies:</b> \(\hat\theta=0\) or \(1\) gives \(\log 0\); \(\hat\sigma^2_{dc}=0\) for a constant feature gives infinite density. Practical fixes: additive smoothing (§9.3.3) and a variance floor (scikit-learn adds \(\epsilon\cdot\max_d\operatorname{Var}(x_d)\), with \(\epsilon=10^{-9}\)).</li>
+          <li>The MLE for \(\sigma^2\) divides by \(N_c\), not \(N_c-1\): it's biased, but that's the maximizer.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>The training table: click to edit, watch the counts</h3>
+    <div class="panel">
+      <p class="hint">Twelve emails. <b>Click a cell</b> to flip whether a word is in that email. <b>Click a label</b> to switch it between spam and ham. Every estimate below updates, and so does the spam filter in §9.3.</p>
+      <div class="two">
+        <div class="scroll"><table class="t data" id="fit-data"></table>
+          <div class="btns"><button class="b" id="fit-reset">Reset table</button></div>
+        </div>
+        <div>
+          <div class="scroll"><table class="t" id="fit-est"></table></div>
+          <div class="chain" id="fit-chain"></div>
+        </div>
+      </div>
+      <p class="cap" style="margin-top:16px">MLE θ̂ for each word, spam vs ham (the dot is the estimate; ⚠ marks an estimate of exactly 0 or 1)</p>
+      <svg class="plot" id="fit-dots" viewBox="0 0 640 200" aria-label="Estimated word probabilities per class"></svg>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equations 9.48 – 9.55</h3>
+    <div class="mathcard">
+      <h4>Write down the likelihood</h4>
+      <ol class="steps">
+        <li><div>\(\displaystyle p(\mathcal D\mid\boldsymbol\theta)=\prod_{n=1}^N\Big[\mathrm{Cat}(y_n\mid\boldsymbol\pi)\prod_{d=1}^D p(x_{nd}\mid y_n,\boldsymbol\theta_d)\Big]\) <span class="why">(9.48) Examples are i.i.d.; each one is "label prob × feature probs given the label."</span></div></li>
+        <li><div>\(\displaystyle =\prod_{n=1}^N\Big[\mathrm{Cat}(y_n\mid\boldsymbol\pi)\prod_{d=1}^D\prod_{c=1}^C p(x_{nd}\mid\theta_{dc})^{\mathbb I(y_n=c)}\Big]\) <span class="why">(9.49) The exponent \(\mathbb I(y_n=c)\) is 1 only for the true class, so the product over \(c\) just picks the right \(\theta_{dc}\).</span></div></li>
+        <li><div>\(\displaystyle \log p(\mathcal D\mid\boldsymbol\theta)=\Big[\sum_{n}\sum_{c}\mathbb I(y_n=c)\log\pi_c\Big]+\sum_{c}\sum_{d}\Big[\sum_{n:\,y_n=c}\log p(x_{nd}\mid\theta_{dc})\Big]\) <span class="why">(9.50) Log of a product is a sum of logs; regroup the terms by \((d,c)\).</span></div></li>
+        <li><div>\(\displaystyle =\log p(\mathcal D_y\mid\boldsymbol\pi)+\sum_c\sum_d\log p(\mathcal D_{dc}\mid\theta_{dc})\) <span class="why">(9.51) \(1 + CD\) separate terms. Each parameter shows up in exactly one, so you can maximize them one at a time.</span></div></li>
+      </ol>
+      <h4>Solve each piece</h4>
+      <div class="eq">\[ \hat\pi_c=\frac{N_c}{N} \qquad\qquad \hat\theta_{dck}=\frac{N_{dck}}{\sum_{k'}N_{dck'}}=\frac{N_{dck}}{N_c} \tag{9.52} \]</div>
+      <p>where \(N_{dck}=\sum_n\mathbb I(x_{nd}=k,\,y_n=c)\) counts how often feature \(d\) took value \(k\) among class-\(c\) examples. For binary features this becomes</p>
+      <div class="eq">\[ \hat\theta_{dc}=\frac{N_{dc}}{N_c}\qquad\text{(fraction of class-}c\text{ examples where feature }d\text{ is on)} \tag{9.53} \]</div>
+      <p>and for Gaussian features, the class-wise sample mean and variance:</p>
+      <div class="eq">\[ \hat\mu_{dc}=\frac{1}{N_c}\sum_{n:\,y_n=c}x_{nd}\qquad \hat\sigma^2_{dc}=\frac{1}{N_c}\sum_{n:\,y_n=c}(x_{nd}-\hat\mu_{dc})^2 \tag{9.54–9.55} \]</div>
+      <div class="note">Where 9.53 comes from: the class-\(c\) term for feature \(d\) is \(N_{dc}\log\theta+(N_c-N_{dc})\log(1-\theta)\). Set its derivative \(\frac{N_{dc}}{\theta}-\frac{N_c-N_{dc}}{1-\theta}\) to zero and solve: \(\theta=N_{dc}/N_c\).</div>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Model fitting</h3><div class="quizbox" data-quiz="fit"></div></div>
+</section>
+
+<!-- ============ 9.3.3 Bayesian NB ============ -->
+<section class="sec" id="bayes">
+  <div class="sec-head"><span class="secnum">§9.3.3</span><h2>Bayesian naive Bayes: add pseudo-counts so nothing is ever impossible</h2></div>
+  <div class="intro">
+    <p>Put a Dirichlet (for two outcomes, a Beta) prior on every \(\boldsymbol\theta_{dc}\) and on \(\boldsymbol\pi\). Because the prior is conjugate, the posterior is the same kind of distribution with the counts added on. Predicting with the posterior mean is the same as adding "pseudo-counts" \(\breve\beta\) to every count. With \(\breve\beta=1\) that's <b>add-one (Laplace) smoothing</b>.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">You've never seen a junk letter that says "meeting." Does that mean a junk letter can <i>never</i> say "meeting"?</p>
+        <p>Of course not. You've only seen 5 junk letters! So before you start counting, you pretend you've already seen one junk letter <i>with</i> every word and one <i>without</i> it. Those pretend letters keep any count from being exactly zero.</p>
+        <p>With lots of real letters, the pretend ones barely matter. With only a few, they keep you from being silly.</p>
+      </div>
+      <div data-l="2">
+        <p>The fix: add 1 to the "yes" count and 1 to the "no" count before dividing.</p>
+        <p>"meeting" in spam: instead of \(0/5=0\), use \((0+1)/(5+2)=1/7\approx0.14\). "free" in spam: instead of \(4/5=0.8\), use \((4+1)/(5+2)=5/7\approx0.71\).</p>
+        <p>Every estimate gets pulled a bit toward 1/2. The pull is strong when there's little data and weak when there's lots. Add 0 and you're back to plain counting. Add a lot, and every estimate is close to 1/2 regardless of the data.</p>
+      </div>
+      <div data-l="3">
+        <p>Prior \(\theta_{dc}\sim\mathrm{Dir}(\breve{\boldsymbol\beta}_{dc})\), likelihood categorical, so the posterior is \(\mathrm{Dir}(\breve{\boldsymbol\beta}_{dc}+\mathbf N_{dc})\) (Eq. 9.56). The <b>posterior predictive</b> for a new feature value is the posterior mean (Eq. 9.57):</p>
+        <p>\(p(x_d=k\mid y=c,\mathcal D)=\dfrac{\breve\beta_{dck}+N_{dck}}{\sum_{k'}(\breve\beta_{dck'}+N_{dck'})}\).</p>
+        <p>Because each \(\theta_{dc}\) appears in its own factor, integrating them out factorizes too, and the full Bayesian prediction is "plug in the posterior means" (Eq. 9.59). That's unusual: in most models, plugging in a point estimate is only an approximation.</p>
+        <p>\(\breve\beta=0\): MLE. \(\breve\beta=1\): Laplace smoothing (uniform prior). \(\breve\beta=\tfrac12\): Jeffreys prior.</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li>The posterior predictive is exact here because the predictive for one new \(\mathbf x\) is linear in each \(\theta_{dck}\) (a product of distinct, a-posteriori independent parameters), so \(\mathbb E[\prod\theta]=\prod\mathbb E[\theta]\). This fails for predicting <i>several</i> new points jointly, where repeated use of the same \(\theta\) gives Dirichlet-multinomial terms.</li>
+          <li>Additive smoothing is a shrinkage estimator toward the prior mean, with weight \(\sum_k\breve\beta_k/(N_c+\sum_k\breve\beta_k)\). Tune \(\breve\beta\) (scikit-learn's <code>alpha</code>) by cross-validation or empirical Bayes (maximize the Dirichlet-multinomial marginal likelihood).</li>
+          <li>For text, Laplace smoothing over a 50k-word vocabulary hands a lot of mass to unseen words. Lidstone (\(\breve\beta\ll1\)), Good–Turing, or hierarchical priors that share strength across classes do better.</li>
+          <li>For Gaussian features the analogous conjugate prior is Normal–Inverse-Gamma per \((d,c)\); the posterior predictive is a Student-t, not a plug-in Gaussian.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Turn up the pseudo-counts</h3>
+    <div class="panel">
+      <p class="hint">The slider sets \(\breve\beta\), the pseudo-count added to <i>both</i> the "word present" and "word absent" counts (and to each class count for the prior). Data come from the table in §9.3.2.</p>
+      <div class="ctrl"><label for="by-b">pseudo-count β̆</label><input type="range" id="by-b" min="0" max="10" step="0.25" value="1"><output id="by-b-o"></output></div>
+      <div class="btns"><span class="lab">jump to:</span><button class="b" data-byb="0">0 (MLE)</button><button class="b" data-byb="0.5">½ (Jeffreys)</button><button class="b" data-byb="1">1 (Laplace)</button><button class="b" data-byb="10">10 (heavy)</button></div>
+      <div class="two-even" style="margin-top:14px">
+        <div>
+          <p class="cap">θ for each word: hollow = MLE (β̆ = 0), filled = smoothed</p>
+          <svg class="plot" id="by-dots" viewBox="0 0 400 240" aria-label="Smoothed versus MLE word probabilities"></svg>
+        </div>
+        <div>
+          <p class="cap">posterior over one θ: Beta(β̆ + N₁, β̆ + N₀)</p>
+          <div class="btns" style="margin-top:0"><select id="by-word" aria-label="word"></select><select id="by-cls" aria-label="class"><option value="1">spam</option><option value="0">ham</option></select></div>
+          <svg class="plot" id="by-beta" viewBox="0 0 400 200" aria-label="Beta posterior density over theta"></svg>
+        </div>
+      </div>
+      <div class="email" style="margin-top:16px"><div class="hdr">Test email: "Winner! Meeting at noon." Click to change it.</div><div class="words" id="by-words"></div></div>
+      <div class="readout">
+        <div class="stat s"><div class="k">p(spam | x), this β̆</div><div class="v" id="by-post"></div></div>
+        <div class="stat"><div class="k">spam score π·Πθ</div><div class="v" id="by-ss"></div></div>
+        <div class="stat"><div class="k">ham score π·Πθ</div><div class="v" id="by-hs"></div></div>
+      </div>
+      <div class="chain" id="by-chain"></div>
+      <p class="cap" style="margin-top:14px">p(spam | test email) as a function of β̆</p>
+      <svg class="plot" id="by-curve" viewBox="0 0 640 160" aria-label="Posterior probability of spam as a function of the pseudo-count"></svg>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equations 9.56 – 9.59</h3>
+    <div class="mathcard">
+      <h4>Conjugate prior in, same family out</h4>
+      <div class="eq">\[ p(\boldsymbol\theta\mid\mathcal D)=\mathrm{Dir}(\boldsymbol\pi\mid\widehat{\boldsymbol\alpha})\prod_{d=1}^D\prod_{c=1}^C\mathrm{Dir}(\boldsymbol\theta_{dc}\mid\widehat{\boldsymbol\beta}_{dc}),\qquad \widehat\alpha_c=\breve\alpha_c+N_c,\quad \widehat\beta_{dck}=\breve\beta_{dck}+N_{dck} \tag{9.56} \]</div>
+      <p>(\(\breve{\ }\) marks the prior's values and \(\widehat{\ }\) the posterior's.) The Dirichlet density is \(\propto\prod_k\theta_k^{\beta_k-1}\) and the likelihood is \(\propto\prod_k\theta_k^{N_k}\). Multiply them and the exponents add, so the posterior is Dirichlet with \(\beta_k+N_k\). That's why \(\breve\beta\) acts like counts from "prior data."</p>
+      <h4>Predict with the posterior mean</h4>
+      <div class="eq">\[ p(x_d=k\mid y=c,\mathcal D)=\bar\theta_{dck}=\frac{\widehat\beta_{dck}}{\sum_{k'}\widehat\beta_{dck'}}=\frac{\breve\beta_{dck}+N_{dck}}{\sum_{k'}\big(\breve\beta_{dck'}+N_{dck'}\big)} \tag{9.57} \]</div>
+      <ol class="steps">
+        <li><div>\(\breve\beta_{dck}=0\) gives \(N_{dck}/N_c\), the MLE of Eq. 9.52. <span class="why">No prior data: just count.</span></div></li>
+        <li><div>\(\breve\beta_{dck}=1\) is add-one (Laplace) smoothing. For binary features: <span class="why">the denominator gains 2 because there are two outcomes.</span>
+          <div class="eq">\[ \bar\theta_{dc}=\frac{\breve\beta_{dc1}+N_{dc1}}{\breve\beta_{dc0}+N_{dc0}+\breve\beta_{dc1}+N_{dc1}}=\frac{1+N_{dc1}}{2+N_{dc}} \tag{9.58} \]</div>
+          (Here \(N_{dc}\) means \(N_c\), the total class-\(c\) count, as in the book.)</div></li>
+        <li><div>With lots of data, \(N\gg\breve\beta\), so \(\bar\theta\to\) the MLE. <span class="why">The prior washes out.</span></div></li>
+      </ol>
+      <h4>Predict the label</h4>
+      <div class="eq">\[ p(y=c\mid\mathbf x,\mathcal D)\;\propto\;p(y=c\mid\mathcal D)\prod_d p(x_d\mid y=c,\mathcal D)=\bar\pi_c\prod_d\prod_k\bar\theta_{dck}^{\,\mathbb I(x_d=k)},\qquad \bar\pi_c=\frac{\widehat\alpha_c}{\sum_{c'}\widehat\alpha_{c'}} \tag{9.59} \]</div>
+      <div class="note">The zero-count trap in numbers: with \(\breve\beta=0\), "winner" has \(\hat\theta_{\text{ham}}=0\) and "meeting" has \(\hat\theta_{\text{spam}}=0\). An email with both makes both class scores exactly 0, and Eq. 9.47 becomes \(0/0\). Any \(\breve\beta>0\) fixes it. Set the slider to 0 to see it.</div>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Bayesian naive Bayes</h3><div class="quizbox" data-quiz="bayes"></div></div>
+</section>
+
+<!-- ============ 9.3.4 NB and LR ============ -->
+<section class="sec" id="lr">
+  <div class="sec-head"><span class="secnum">§9.3.4</span><h2>Naive Bayes and logistic regression have the same shape of answer</h2></div>
+  <div class="intro">
+    <p>Take NB's posterior, write it in logs, and it turns into a softmax of a <b>linear</b> function of the (one-hot) features. That's exactly the form of multinomial logistic regression. The two models can represent the same set of classifiers. They differ in how they <i>choose</i> the weights: NB maximizes the joint likelihood \(p(\mathbf x,y)\), logistic regression the conditional likelihood \(p(y\mid\mathbf x)\).</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">Every clue gives the detective a number of points toward junk or toward friends.</p>
+        <p>"FREE" might be worth +2 points toward junk. "lunch" might be worth −1. Add up the points and see which side wins.</p>
+        <p>There are two ways to decide how many points each clue is worth. Naive Bayes counts how often each clue shows up in each box. Another method, called logistic regression, keeps adjusting the points until it sorts the practice letters as well as it can. Same kind of scorecard, two different ways of filling it in.</p>
+      </div>
+      <div data-l="2">
+        <p>Naive Bayes multiplies factors. Logs turn multiplying into adding. So "log of the spam score minus log of the ham score" is a <b>sum</b>: a starting value plus one number per word that's present.</p>
+        <p>A sum of "weight × feature" plus a constant is a straight line (or flat plane). Pass it through the S-shaped <b>sigmoid</b> \(1/(1+e^{-z})\) and you get a probability. That's logistic regression's formula.</p>
+        <p>So NB is secretly a logistic regression whose weights were set by counting. Try the 1-D Gaussian demo: when the two bells have the same width, the log-odds is a straight line. Make the widths different and it bends into a parabola.</p>
+      </div>
+      <div data-l="3">
+        <p>With one-hot \(x_{dk}=\mathbb I(x_d=k)\), \(\log[\pi_c\prod_{d,k}\theta_{dck}^{x_{dk}}]=\log\pi_c+\sum_{d,k}x_{dk}\log\theta_{dck}=\boldsymbol\beta_c^\top\mathbf x+\gamma_c\), with \(\beta_{c,dk}=\log\theta_{dck}\), \(\gamma_c=\log\pi_c\). The normalized version is a softmax (Eq. 9.62).</p>
+        <p>For two classes and binary features, the log-odds is \(w_0+\sum_d w_dx_d\) with \(w_d=\log\frac{\theta_{d1}(1-\theta_{d0})}{\theta_{d0}(1-\theta_{d1})}\). The binary panel computes it and checks that \(\sigma(\mathbf w^\top\mathbf x+w_0)\) matches Eq. 9.47 to the last digit.</p>
+        <p>The fitting objectives differ. NB maximizes \(\prod_n p(y_n,\mathbf x_n\mid\boldsymbol\theta)\), which decouples into counts. LR maximizes \(\prod_n p(y_n\mid\mathbf x_n,\mathbf w)\), which couples all weights and needs iterative optimization. If the NB assumption holds, both converge to the same classifier. If not, LR's weights are better for prediction.</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li>The result holds whenever every \(p(x_d\mid y)\) is in an exponential family with a class-independent base measure and sufficient statistic: \(\log p(x_d\mid c)=\boldsymbol\eta_{dc}^\top T(x_d)-A(\boldsymbol\eta_{dc})+\log h(x_d)\), and \(h\) cancels across classes. For Gaussians, \(T=(x,x^2)\), so LR on features \((x,x^2)\); with tied \(\sigma_d\) the \(x^2\) weight is 0.</li>
+          <li>NB and LR are a <b>generative–discriminative pair</b> (Ng &amp; Jordan 2002): same hypothesis class, different estimators. NB's estimate is the MLE under a constrained joint; LR's is the conditional MLE. Under misspecification, LR is consistent for the best linear classifier in log-loss, NB is not.</li>
+          <li>This is why NB weights can be used to initialize, or regularize toward, LR (e.g. NBSVM, Wang &amp; Manning 2012, which scales features by NB log-count ratios).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Two views of one classifier</h3>
+    <div class="panel">
+      <h4>Binary features: NB's weights, read off as logistic regression</h4>
+      <p class="hint">Weights are computed from the §9.3.2 table with add-one smoothing. Toggle words, and compare Eq. 9.47's product form with the sigmoid of a weighted sum.</p>
+      <div class="email"><div class="hdr">Email</div><div class="words" id="lr-words"></div></div>
+      <div class="scroll" style="margin-top:12px"><table class="t" id="lr-table"></table></div>
+      <div class="readout">
+        <div class="stat s"><div class="k">NB: π·Πθ, normalized</div><div class="v" id="lr-nb"></div></div>
+        <div class="stat m"><div class="k">LR form: σ(w·x + w₀)</div><div class="v" id="lr-lr"></div></div>
+        <div class="stat"><div class="k">difference</div><div class="v" id="lr-diff"></div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h4>Real-valued feature: when is the boundary linear?</h4>
+      <p class="hint">One Gaussian feature, two classes. Top: \(\pi_c\,\mathcal N(x\mid\mu_c,\sigma_c^2)\). Bottom: the log-odds (purple) and \(p(y=1\mid x)\) (green). With equal σ's the log-odds is a straight line, so the posterior is a logistic sigmoid. With unequal σ's it's a parabola and there can be two boundaries.</p>
+      <svg class="plot" id="g1-top" viewBox="0 0 640 170" aria-label="Weighted class-conditional densities"></svg>
+      <svg class="plot" id="g1-bot" viewBox="0 0 640 190" aria-label="Log-odds and posterior probability of class 1"></svg>
+      <div class="two-even">
+        <div>
+          <div class="ctrl"><label for="g1-m1" style="color:var(--spam)">μ₁</label><input type="range" id="g1-m1" min="-3" max="3" step="0.1" value="-1"><output></output></div>
+          <div class="ctrl"><label for="g1-s1" style="color:var(--spam)">σ₁</label><input type="range" id="g1-s1" min="0.3" max="2.5" step="0.05" value="1"><output></output></div>
+          <div class="ctrl"><label for="g1-pi">π₁</label><input type="range" id="g1-pi" min="0.05" max="0.95" step="0.05" value="0.5"><output></output></div>
+        </div>
+        <div>
+          <div class="ctrl"><label for="g1-m2" style="color:var(--ham)">μ₂</label><input type="range" id="g1-m2" min="-3" max="3" step="0.1" value="1.2"><output></output></div>
+          <div class="ctrl"><label for="g1-s2" style="color:var(--ham)">σ₂</label><input type="range" id="g1-s2" min="0.3" max="2.5" step="0.05" value="1"><output></output></div>
+          <div class="btns" style="margin-top:4px"><button class="b" id="g1-tie">Tie σ₂ = σ₁</button></div>
+        </div>
+      </div>
+      <div class="chain" id="g1-chain"></div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equations 9.60 – 9.62</h3>
+    <div class="mathcard">
+      <h4>One-hot features turn the product into a sum</h4>
+      <p>Let \(x_{dk}=\mathbb I(x_d=k)\). Then</p>
+      <div class="eq">\[ p(\mathbf x\mid y=c,\boldsymbol\theta)=\prod_{d=1}^D\mathrm{Cat}(x_d\mid y=c,\boldsymbol\theta)=\prod_{d=1}^D\prod_{k=1}^K\theta_{dck}^{\,x_{dk}} \tag{9.60} \]</div>
+      <ol class="steps">
+        <li><div>\(\displaystyle p(y=c\mid\mathbf x,\boldsymbol\theta)=\frac{\pi_c\prod_d\prod_k\theta_{dck}^{x_{dk}}}{\sum_{c'}\pi_{c'}\prod_d\prod_k\theta_{dc'k}^{x_{dk}}}\) <span class="why">Eq. 9.47 with 9.60 plugged in.</span></div></li>
+        <li><div>\(\displaystyle =\frac{\exp\big[\log\pi_c+\sum_d\sum_k x_{dk}\log\theta_{dck}\big]}{\sum_{c'}\exp\big[\log\pi_{c'}+\sum_d\sum_k x_{dk}\log\theta_{dc'k}\big]}\) <span class="why">(9.61) Any positive number equals \(\exp(\log(\cdot))\). The log turns the products into sums and brings the exponent \(x_{dk}\) down front.</span></div></li>
+        <li><div>Collect the \(\log\theta_{dck}\) into a vector \(\class{tm}{\boldsymbol\beta_c}\) (one entry per \((d,k)\)) and let \(\class{tm}{\gamma_c}=\log\pi_c\). Then the exponent is \(\boldsymbol\beta_c^\top\mathbf x+\gamma_c\). <span class="why">Linear in the one-hot features.</span></div></li>
+      </ol>
+      <div class="eq">\[ p(y=c\mid\mathbf x,\boldsymbol\theta)=\frac{e^{\class{tm}{\boldsymbol\beta_c}^\top\mathbf x+\class{tm}{\gamma_c}}}{\sum_{c'=1}^Ce^{\boldsymbol\beta_{c'}^\top\mathbf x+\gamma_{c'}}} \tag{9.62} \]</div>
+      <p>That's the softmax of multinomial logistic regression (§2.5.3).</p>
+      <h4>Two classes, binary features: the sigmoid version</h4>
+      <p>Divide the top and bottom of 9.62 by the ham term and you get \(\sigma(z)\) with \(z\) = (spam exponent) − (ham exponent):</p>
+      <div class="eq">\[ z=\underbrace{\log\frac{\pi_1}{\pi_0}+\sum_d\log\frac{1-\theta_{d1}}{1-\theta_{d0}}}_{w_0}+\sum_d x_d\underbrace{\log\frac{\theta_{d1}(1-\theta_{d0})}{\theta_{d0}(1-\theta_{d1})}}_{w_d} \]</div>
+      <h4>Same form, different objective</h4>
+      <div class="eq">\[ \text{NB: }\max_{\boldsymbol\theta}\prod_n p(y_n,\mathbf x_n\mid\boldsymbol\theta)\qquad\qquad\text{LR: }\max_{\mathbf w}\prod_n p(y_n\mid\mathbf x_n,\mathbf w) \]</div>
+      <div class="note">The joint objective also has to explain \(\mathbf x\), and under the naive assumption it does so badly when features are correlated. The conditional objective spends all its effort on the decision. In general the two give different weights (Exercise 10.3).</div>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>NB and logistic regression</h3><div class="quizbox" data-quiz="lr"></div></div>
+</section>
+
+<!-- ============ 9.4 / 9.4.1 Generative vs discriminative ============ -->
+<section class="sec" id="gvd">
+  <div class="sec-head"><span class="secnum">§9.4–9.4.1</span><h2>Generative vs discriminative, and where discriminative wins</h2></div>
+  <div class="intro">
+    <p>A <b>generative</b> classifier models \(p(\mathbf x,y)=p(y)\,p(\mathbf x\mid y)\). It could generate fake examples of each class. A <b>discriminative</b> classifier models only \(p(y\mid\mathbf x)\). It can tell classes apart but can't say what an example looks like. Discriminative models usually win on accuracy, handle arbitrary feature preprocessing, and give better-calibrated probabilities.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">Two kids learn to tell cats from dogs.</p>
+        <p>The first kid learns to <b>draw</b> cats and dogs: ears, tails, whiskers, everything. To decide, she asks "which drawing does this animal look more like?" That's <b>generative</b>.</p>
+        <p>The second kid only learns the <b>difference</b>: "pointy ears and whiskers means cat." He can't draw either animal, but he's quick and usually right. That's <b>discriminative</b>.</p>
+        <p>The second kid doesn't waste time learning things that don't help him decide. That's why he's often more accurate. But the first kid is better with only a few pictures to learn from, and she can still decide if part of the animal is hidden.</p>
+      </div>
+      <div data-l="2">
+        <ul>
+          <li><b>Less to learn.</b> The class-conditional densities can be complicated (bumpy, lots of detail), while the posterior \(p(y\mid x)\) is often a simple S-curve. Figure 9.8's demo shows bumps that change \(p(x\mid y)\) a lot but leave \(p(y\mid x)\) almost unchanged.</li>
+          <li><b>Feature tricks.</b> You can feed a discriminative model \(x\), \(x^2\), \(x^3\)… or word embeddings, with no need to describe how those features are distributed.</li>
+          <li><b>Honest probabilities.</b> NB counts correlated clues as if they were separate evidence, so it says "99.9% spam" when it should say "80%." The calibration demo duplicates a word to show this.</li>
+          <li><b>But</b>: with very little data, NB often wins (the learning-curve demo).</li>
+        </ul>
+      </div>
+      <div data-l="3">
+        <p>The three advantages in §9.4.1, made concrete:</p>
+        <ul>
+          <li><b>Accuracy.</b> Modeling \(p(\mathbf x\mid y)\) spends parameters and data on structure that may not affect the decision. When the generative model is misspecified (correlated features under NB), its errors propagate into \(p(y\mid\mathbf x)\). LR fits the decision boundary directly and wins asymptotically.</li>
+          <li><b>Preprocessing.</b> \(p(y\mid\phi(\mathbf x))\) is fine for any \(\phi\). A generative model of \(\phi(\mathbf x)\) has to account for the dependencies \(\phi\) creates (e.g. \(x\) and \(x^2\) are deterministically related).</li>
+          <li><b>Calibration.</b> If two features are copies, NB counts that evidence twice, so its log-odds is roughly doubled and probabilities are pushed toward 0 or 1.</li>
+        </ul>
+        <p>The learning-curve demo reproduces Ng &amp; Jordan's (2002) finding: NB has higher asymptotic error when its assumption is violated, but reaches its asymptote much faster.</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Ng &amp; Jordan (2002):</b> for a generative–discriminative pair, \(\epsilon_{\text{LR},\infty}\le\epsilon_{\text{NB},\infty}\), but NB reaches within \(\epsilon\) of its asymptote with \(O(\log D)\) samples versus \(O(D)\) for LR. Hence the crossover. Later work (Xue &amp; Titterington 2008) shows the crossover isn't universal; it depends on the data distribution.</li>
+          <li><b>Efficiency when correctly specified:</b> Efron (1975) showed that when the Gaussian LDA model is true, LDA is 1.5–3× more statistically efficient than LR. Generative assumptions are information. When they're right they help, and when they're wrong they bias.</li>
+          <li><b>Calibration:</b> NB's overconfidence is approximately a monotone transform of a decent score, so Platt scaling or isotonic regression on held-out data (Zadrozny &amp; Elkan 2002; Niculescu-Mizil &amp; Caruana 2005) often fixes it while keeping the ranking.</li>
+          <li><b>Hybrids:</b> train generative models discriminatively (conditional likelihood, maximum margin), or blend objectives (Bouchard &amp; Triggs 2004; Lasserre, Bishop &amp; Minka 2006).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Three ways discriminative models come out ahead</h3>
+    <div class="panel">
+      <h4>1 · Complex densities, simple posterior (Figure 9.8)</h4>
+      <p class="hint">Left: \(p(x\mid y=1)\) and \(p(x\mid y=2)\). Right: the posteriors. Turn up the <b>wiggle</b>: it adds bumps to \(p(x\mid y=1)\) in a region where class 2 has almost no density. A generative model has to learn every bump. The posterior barely moves, since it's ≈ 1 there either way.</p>
+      <div class="two-even">
+        <svg class="plot" id="f98-a" viewBox="0 0 400 230" aria-label="Class-conditional densities"></svg>
+        <svg class="plot" id="f98-b" viewBox="0 0 400 230" aria-label="Class posteriors"></svg>
+      </div>
+      <div class="ctrl"><label for="f98-w">wiggle in p(x|y=1)</label><input type="range" id="f98-w" min="0" max="1" step="0.05" value="0.5"><output></output></div>
+    </div>
+    <div class="panel">
+      <h4>2 · Learning curves: NB vs logistic regression</h4>
+      <p class="hint">12 real-valued features, in pairs that share a common noise source with correlation ρ. Within a pair, one feature is 4× more informative than the other, so the correlation actually matters. At ρ = 0 the naive Bayes assumption is exactly true. We fit Gaussian NB (one variance per feature, shared by both classes) and logistic regression on training sets of size N, averaged over 16 draws, and measure error on 2000 fresh test points.</p>
+      <svg class="plot" id="lc-plot" viewBox="0 0 640 280" aria-label="Test error versus training set size for naive Bayes and logistic regression"></svg>
+      <div class="ctrl"><label for="lc-rho">within-pair ρ</label><input type="range" id="lc-rho" min="0" max="0.9" step="0.1" value="0.5"><output></output></div>
+      <div class="chain" id="lc-chain"></div>
+    </div>
+    <div class="panel">
+      <h4>3 · Calibration: counting the same clue twice</h4>
+      <p class="hint">Take an email that contains just "free" (spam model from §9.3). Now suppose the feature set also has copies of that word, like "FREE", "Free!!" and "fr3e", which always appear together. Each copy is a new feature to NB, so it multiplies in the same evidence again. The real evidence hasn't changed.</p>
+      <div class="ctrl"><label for="cal-k">copies of "free"</label><input type="range" id="cal-k" min="1" max="8" step="1" value="1"><output></output></div>
+      <p class="cap" style="margin-top:10px">what NB reports</p><div class="pbar" id="cal-nb"></div>
+      <p class="cap" style="margin-top:10px">the right answer (copies add no information)</p><div class="pbar" id="cal-true"></div>
+      <div class="chain" id="cal-chain"></div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>What each approach models</h3>
+    <div class="mathcard">
+      <h4>Generative</h4>
+      <div class="eq">\[ p(\mathbf x,y)=p(y)\,p(\mathbf x\mid y)\quad\Longrightarrow\quad p(y=c\mid\mathbf x)=\frac{p(y=c)\,p(\mathbf x\mid y=c)}{\sum_{c'}p(y=c')\,p(\mathbf x\mid y=c')} \]</div>
+      <p>Two pieces to fit, then Bayes' rule. You can also <i>sample</i>: draw \(y\sim p(y)\), then \(\mathbf x\sim p(\mathbf x\mid y)\).</p>
+      <h4>Discriminative</h4>
+      <div class="eq">\[ p(y\mid\mathbf x)\text{ directly, e.g. } p(y=1\mid\mathbf x)=\sigma(\mathbf w^\top\phi(\mathbf x)+w_0) \]</div>
+      <p>Nothing is said about how \(\mathbf x\) is distributed, so \(\phi\) can be anything.</p>
+      <h4>Why copies make NB overconfident</h4>
+      <ol class="steps">
+        <li><div>If feature \(d\) appears \(k\) times, NB's log-odds gets its vote \(k\) times: \(z_k=\log\frac{\pi_1}{\pi_0}+k\,\log\frac{\theta_{d1}}{\theta_{d0}}+\dots\) <span class="why">Every copy gets its own factor in Eq. 9.46.</span></div></li>
+        <li><div>The truth: copies are perfectly dependent given the class, \(p(x_d,x_d'\mid c)=p(x_d\mid c)\), so the right log-odds counts the vote <b>once</b>. <span class="why">Seeing the same thing twice isn't new information.</span></div></li>
+        <li><div>\(\sigma(z_k)\) is pushed toward 0 or 1 as \(k\) grows. The <i>sign</i> of \(z\) often survives, so the label can still be right while the probability is badly off. <span class="why">That's "accurate but poorly calibrated."</span></div></li>
+      </ol>
+      <h4>The learning-curve demo's ingredients</h4>
+      <p>NB here: class means \(\hat\mu_{dc}\) plus one variance \(\hat\sigma_d^2\) per feature, pooled over both classes and nudged by a weak prior worth 2 pseudo-observations of variance 1 (the Gaussian cousin of §9.3.3's pseudo-counts, so a training set of 8 doesn't produce wild variances). Shared variances give a linear boundary. LR: the conditional MLE with a tiny L2 penalty (λ = 10⁻³, needed when N is smaller than D and the data are separable), fit by Newton's method (IRLS). Both are linear classifiers. Only the fitting objective differs, exactly the §9.3.4 point.</p>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Generative vs discriminative</h3><div class="quizbox" data-quiz="gvd"></div></div>
+</section>
+
+<!-- ============ 9.4.2 Advantages of generative ============ -->
+<section class="sec" id="gen">
+  <div class="sec-head"><span class="secnum">§9.4.2</span><h2>Where generative classifiers win</h2></div>
+  <div class="intro">
+    <p>Modeling \(\mathbf x\) costs accuracy when data are plentiful, but it buys real things: fitting by counting, handling missing inputs, adding classes without retraining, using unlabeled data, and sometimes robustness to features that only <i>look</i> predictive.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">Remember the kid who learned to <b>draw</b> cats and dogs?</p>
+        <ul>
+          <li>She learned fast. She just looked at a few of each and took notes.</li>
+          <li>If a bush hides the animal's tail, she still compares what she <i>can</i> see.</li>
+          <li>When a rabbit shows up, she learns to draw rabbits too. Her cat and dog drawings don't change.</li>
+          <li>Even pictures without a name tag help her, because they show her what animals look like.</li>
+        </ul>
+      </div>
+      <div data-l="2">
+        <ul>
+          <li><b>Easy to fit:</b> NB is counting and averaging, one pass over the data. Logistic regression needs an optimizer to run many passes.</li>
+          <li><b>Missing features:</b> just leave that feature's factor out (§9.4.3).</li>
+          <li><b>New classes:</b> each class's numbers are computed only from that class's examples. Adding a class means adding a new column of numbers. Nothing else changes. Try removing classes in the digits demo in §9.3.1.</li>
+          <li><b>Unlabeled data:</b> a generative model can guess the labels of unlabeled examples and learn from them (EM, §8.7).</li>
+          <li><b>Spurious features:</b> if every cow photo in training happens to be on grass, a discriminative model may learn "grass means cow." A model of what cows look like is less likely to fall for that.</li>
+        </ul>
+      </div>
+      <div data-l="3">
+        <ul>
+          <li><b>Easy to fit:</b> closed-form MLE/MAP from sufficient statistics (§9.3.2). LR is a convex problem needing iterative solvers; neural nets are nonconvex.</li>
+          <li><b>Missing inputs:</b> marginalize, \(p(y\mid\mathbf x_{\text{obs}})\propto p(y)\sum_{\mathbf x_{\text{mis}}}p(\mathbf x\mid y)\). There is no principled analogue for \(p(y\mid\mathbf x)\).</li>
+          <li><b>Classes separately:</b> the joint log-likelihood decouples by class (Eq. 9.51), so adding class \(C+1\) touches only \(\boldsymbol\theta_{\cdot,C+1}\) and \(\boldsymbol\pi\). In softmax regression, the normalizer couples all classes.</li>
+          <li><b>Semi-supervised:</b> \(\log p(\mathcal D_{xy})+\log\sum_y p(\mathcal D_x,y)\), maximized by EM with \(y\) latent for unlabeled points.</li>
+          <li><b>Spurious features / shift:</b> a model of \(p(\mathbf x\mid y)\) can match the causal direction (label → appearance), which tends to be more stable under distribution shift.</li>
+        </ul>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Semi-supervised caveats:</b> unlabeled data help only if the generative model is (approximately) correct. Under misspecification, EM can make things worse (Cozman &amp; Cohen 2003). Weighting the unlabeled term (Nigam et al. 2000) is the standard hedge.</li>
+          <li><b>Causal / anticausal learning</b> (Schölkopf et al. 2012): when \(y\to\mathbf x\) is the causal direction, \(p(\mathbf x\mid y)\) is a stable mechanism, and SSL and generative modeling help; for \(\mathbf x\to y\) problems, \(p(\mathbf x)\) carries no information about \(p(y\mid\mathbf x)\).</li>
+          <li><b>Open-set detection:</b> \(p(\mathbf x)=\sum_c\pi_cp(\mathbf x\mid c)\) gives an out-of-distribution score for free, though deep generative likelihoods are notoriously unreliable for OOD (Nalisnick et al. 2019).</li>
+          <li><b>Label shift:</b> if only \(p(y)\) changes at test time, a generative model adapts by re-estimating \(\boldsymbol\pi\) alone (Saerens et al. 2002).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Pick the right tool: generative or discriminative?</h3>
+    <div class="panel">
+      <p class="hint">For each situation, choose the kind of classifier the reading would recommend. You'll get the reason right away. (These count toward your quiz score.)</p>
+      <div class="scen" id="scen"></div>
+    </div>
+    <div class="panel">
+      <h4>Side by side</h4>
+      <div class="scroll"><table class="vs">
+        <thead><tr><th></th><th style="color:var(--spam)">Generative, e.g. naive Bayes</th><th style="color:var(--ham)">Discriminative, e.g. logistic regression</th></tr></thead>
+        <tbody>
+          <tr><th>models</th><td>\(p(y)\,p(\mathbf x\mid y)\)</td><td>\(p(y\mid\mathbf x)\)</td></tr>
+          <tr><th>fitting</th><td>Counting / averaging, closed form</td><td>Convex (LR) or nonconvex (nets) optimization</td></tr>
+          <tr><th>accuracy</th><td>Better with little data</td><td>Usually better with lots of data</td></tr>
+          <tr><th>features</th><td>Must model them, so preprocessing is awkward</td><td>Any \(\phi(\mathbf x)\): polynomials, embeddings</td></tr>
+          <tr><th>probabilities</th><td>Often overconfident (NB)</td><td>Usually better calibrated</td></tr>
+          <tr><th>missing x</th><td>Marginalize it out</td><td>No principled answer</td></tr>
+          <tr><th>new class</th><td>Fit just the new class</td><td>Retrain everything</td></tr>
+          <tr><th>unlabeled data</th><td>Natural (EM)</td><td>No unique best way</td></tr>
+          <tr><th>spurious features</th><td>May be more robust</td><td>May latch onto them</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Why adding a class is cheap for generative models</h3>
+    <div class="mathcard">
+      <p>From Eq. 9.51 the joint log-likelihood is a sum of independent pieces:</p>
+      <div class="eq">\[ \log p(\mathcal D\mid\boldsymbol\theta)=\log p(\mathcal D_y\mid\boldsymbol\pi)+\sum_{c=1}^{C}\underbrace{\sum_d\log p(\mathcal D_{dc}\mid\theta_{dc})}_{\text{only class }c\text{'s data}} \]</div>
+      <p>Add class \(C+1\): fit its \(\theta_{d,C+1}\) from its own examples and recompute \(\hat\pi_c=N_c/N\). Every other \(\theta_{dc}\) is unchanged.</p>
+      <p>Softmax regression's conditional log-likelihood is</p>
+      <div class="eq">\[ \sum_n\Big[\mathbf w_{y_n}^\top\mathbf x_n-\log\sum_{c'}e^{\mathbf w_{c'}^\top\mathbf x_n}\Big] \]</div>
+      <p>The \(\log\sum_{c'}\) term contains every class's weights for every example. Add a class and the gradient for every \(\mathbf w_c\) changes, so the whole thing has to be re-optimized.</p>
+      <h4>Semi-supervised objective</h4>
+      <div class="eq">\[ \log p(\mathcal D\mid\boldsymbol\theta)=\sum_{(\mathbf x,y)\in\mathcal D_{xy}}\log p(\mathbf x,y\mid\boldsymbol\theta)+\sum_{\mathbf x\in\mathcal D_x}\log\sum_{c}p(\mathbf x,y=c\mid\boldsymbol\theta) \]</div>
+      <p>The second sum is a mixture model with the class as the hidden variable, which is exactly what EM handles. A discriminative \(p(y\mid\mathbf x)\) puts no term on \(\mathbf x\) alone, so unlabeled points don't enter its likelihood at all.</p>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Advantages of generative classifiers</h3><div class="quizbox" data-quiz="gen"></div></div>
+</section>
+
+<!-- ============ 9.4.3 Missing features ============ -->
+<section class="sec" id="missing">
+  <div class="sec-head"><span class="secnum">§9.4.3</span><h2>Handling missing features: under naive Bayes, just skip the factor</h2></div>
+  <div class="intro">
+    <p>If some features aren't observed, a generative classifier sums (marginalizes) them out. Under the naive Bayes assumption the sum of a feature's own factor over all its values is 1, so a missing feature simply drops out of the product. (This assumes the fact that a value is missing says nothing about what it would have been.)</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">A page of the letter got torn off, so you can't tell if it said "FREE."</p>
+        <p>Do you pretend it didn't say "FREE"? No, that's a guess, and it might be wrong. The detective just skips that clue and decides using the clues she can still see.</p>
+        <p>In the digit game, cover the bottom of a number with your hand. The computer only looks at the top part, and it's often still right.</p>
+      </div>
+      <div data-l="2">
+        <p>For a missing word, the right move is to average over both possibilities, "it was there" and "it wasn't," weighted by how likely each is:</p>
+        <p>θ × (rest) + (1 − θ) × (rest) = (θ + 1 − θ) × (rest) = 1 × (rest).</p>
+        <p>So the missing word's factor becomes 1 and disappears. That's what you see in the table when you set a word to "?".</p>
+        <p>Filling in a blank with "absent" (0) instead is <i>not</i> the same. It adds a (1 − θ) factor, which is evidence you don't actually have. The occlusion demo shows how that can flip the answer.</p>
+      </div>
+      <div data-l="3">
+        <p>Eq. 9.63–9.65: \(p(y=c\mid\mathbf x_{2:D})\propto\pi_c\sum_{x_1}p(x_1,\mathbf x_{2:D}\mid c)\). Under NB the joint factorizes, the sum moves onto the one factor that depends on \(x_1\), and \(\sum_{x_1}p(x_1\mid\theta_{1c})=1\).</p>
+        <p>For a general generative model you still marginalize, just with more work. For GDA you take the Gaussian's marginal over the observed coordinates (drop rows and columns of \(\boldsymbol\Sigma_c\), §3.2.3).</p>
+        <p>The assumption doing the heavy lifting: data are <b>missing at random</b> (MAR), i.e. whether a feature is missing doesn't depend on its value. If spammers deliberately hide words, the missingness itself is informative and should be modeled as a feature.</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Missingness mechanisms</b> (Rubin 1976): MCAR and MAR allow ignoring the mechanism in likelihood-based inference; MNAR does not. Under MNAR, add a missingness indicator \(m_d\) with its own \(p(m_d\mid y)\). With NB that's just one more Bernoulli factor.</li>
+          <li><b>Training with missing data:</b> NB's MLE simply uses the observed entries for each \((d,c)\) count (\(N_c\) becomes per-feature), which is exact under MAR because the likelihood still factorizes. GDA with missing training entries needs EM.</li>
+          <li><b>Discriminative workarounds:</b> mean/zero imputation (biased, as the demo shows), multiple imputation, indicator features, or models trained with dropout-style masking. All need a model of \(\mathbf x\) somewhere, or a lot of data with realistic missingness patterns.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Marginalize vs. fill in a guess</h3>
+    <div class="panel">
+      <h4>Spam filter with unknown words</h4>
+      <p class="hint">Each word now has three states: <b>present</b>, <b>absent</b>, or <span style="color:var(--gap)"><b>? unknown</b></span>. Click to cycle. For an unknown word, both possible values are summed, and the factor becomes θ + (1 − θ) = 1.</p>
+      <div class="email"><div class="hdr">Email with a torn corner</div><div class="words" id="ms-words"></div></div>
+      <div class="scroll" style="margin-top:12px"><table class="t" id="ms-table"></table></div>
+      <p class="cap" style="margin-top:12px">p(spam | what we can see)</p><div class="pbar" id="ms-bar"></div>
+      <p class="cap" style="margin-top:10px">if you instead filled every "?" with "absent"</p><div class="pbar" id="ms-bar0"></div>
+    </div>
+    <div class="panel">
+      <h4>Occlusion: hide part of a digit</h4>
+      <p class="hint">A test digit from the §9.3.1 model. Hide rows from the bottom up. <b>Marginalize</b> uses only the visible pixels. <b>Fill with white</b> pretends the hidden pixels are off, which is the kind of guess you'd be forced into with a model that needs every input.</p>
+      <div class="two">
+        <div>
+          <svg class="plot" id="oc-img" viewBox="0 0 140 180" style="max-width:220px" aria-label="Digit with hidden rows"></svg>
+          <div class="ctrl"><label for="oc-h">rows hidden</label><input type="range" id="oc-h" min="0" max="8" step="1" value="4"><output></output></div>
+          <div class="btns"><button class="b pri" id="oc-new">New test digit</button></div>
+          <p class="cap" id="oc-true" style="margin-top:8px"></p>
+        </div>
+        <div>
+          <p class="cap">marginalize (skip hidden pixels)</p><div class="postbars" id="oc-marg"></div>
+          <p class="cap" style="margin-top:12px">fill hidden pixels with white (0)</p><div class="postbars" id="oc-fill"></div>
+        </div>
+      </div>
+      <div class="readout">
+        <div class="stat g"><div class="k">accuracy, marginalize</div><div class="v" id="oc-am"></div></div>
+        <div class="stat s"><div class="k">accuracy, fill with 0</div><div class="v" id="oc-af"></div></div>
+      </div>
+      <p class="hint" style="margin:8px 0 0">Accuracies are over the 500 test digits with the same number of rows hidden.</p>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equations 9.63 – 9.65</h3>
+    <div class="mathcard">
+      <p>Suppose \(x_1\) is missing.</p>
+      <ol class="steps">
+        <li><div>\(\displaystyle p(y=c\mid\mathbf x_{2:D},\boldsymbol\theta)\propto p(y=c\mid\boldsymbol\pi)\,p(\mathbf x_{2:D}\mid y=c,\boldsymbol\theta)\) <span class="why">(9.63) Bayes' rule using only what we observed.</span></div></li>
+        <li><div>\(\displaystyle =p(y=c\mid\boldsymbol\pi)\sum_{x_1}p(x_1,\mathbf x_{2:D}\mid y=c,\boldsymbol\theta)\) <span class="why">(9.64) The sum rule: the marginal of the observed part is the joint summed over every value the missing part could take.</span></div></li>
+        <li><div>Under NB, \(\displaystyle\sum_{x_1}p(x_1,\mathbf x_{2:D}\mid c)=\sum_{x_1}\Big[p(x_1\mid\theta_{1c})\prod_{d=2}^Dp(x_d\mid\theta_{dc})\Big]\) <span class="why">Factorize with Eq. 9.46.</span></div></li>
+        <li><div>\(\displaystyle =\Big[\sum_{x_1}p(x_1\mid\theta_{1c})\Big]\prod_{d=2}^Dp(x_d\mid\theta_{dc})=\prod_{d=2}^Dp(x_d\mid\theta_{dc})\) <span class="why">(9.65) The product over \(d\ge2\) doesn't involve \(x_1\), so it comes out of the sum. What's left is a distribution summed over all its values, which is 1.</span></div></li>
+      </ol>
+      <div class="note">For a binary feature the bracket is \(\theta_{1c}+(1-\theta_{1c})=1\). "Fill with 0" instead keeps a factor of \(1-\theta_{1c}\), which differs across classes, and so it changes the answer.</div>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Missing features</h3><div class="quizbox" data-quiz="missing"></div></div>
+</section>
+
+<!-- ============ CHEAT SHEET ============ -->
+<section class="sec" id="cheat">
+  <div class="sec-head"><span class="secnum">—</span><h2>Cheat sheet</h2></div>
+  <div class="block">
+    <div class="panel scroll">
+      <table class="vs">
+        <thead><tr><th></th><th>In words</th><th>In symbols</th></tr></thead>
+        <tbody>
+          <tr><th>NB assumption</th><td>Features are independent once you know the class.</td><td>\(p(\mathbf x\mid c)=\prod_d p(x_d\mid\theta_{dc})\)</td></tr>
+          <tr><th>Posterior</th><td>Prior × per-feature factors, normalized.</td><td>\(p(c\mid\mathbf x)\propto\pi_c\prod_dp(x_d\mid\theta_{dc})\)</td></tr>
+          <tr><th>Log-odds</th><td>A sum of one vote per feature, plus the prior's vote.</td><td>\(\log\frac{\pi_1}{\pi_0}+\sum_d\log\frac{p(x_d\mid1)}{p(x_d\mid0)}\)</td></tr>
+          <tr><th>Parameters</th><td>One small set per feature per class.</td><td>\(O(CD)\) vs \(O(C\,2^D)\) for a full joint</td></tr>
+          <tr><th>Bernoulli</th><td>Chance the feature is on.</td><td>\(\theta_{dc}^{x_d}(1-\theta_{dc})^{1-x_d}\)</td></tr>
+          <tr><th>Gaussian</th><td>GDA with diagonal covariance; axis-aligned ellipses.</td><td>\(\mathcal N(\mathbf x\mid\boldsymbol\mu_c,\operatorname{diag}\boldsymbol\sigma_c^2)\)</td></tr>
+          <tr><th>MLE</th><td>Count and divide; average for Gaussians.</td><td>\(\hat\pi_c=\frac{N_c}N,\;\hat\theta_{dck}=\frac{N_{dck}}{N_c},\;\hat\mu_{dc},\hat\sigma^2_{dc}\)</td></tr>
+          <tr><th>Smoothing</th><td>Add pseudo-counts so nothing is impossible.</td><td>\(\bar\theta_{dc}=\frac{1+N_{dc1}}{2+N_c}\) (Laplace)</td></tr>
+          <tr><th>Bayesian NB</th><td>Conjugate Dirichlet prior; predict with the posterior mean.</td><td>\(\widehat\beta_{dck}=\breve\beta_{dck}+N_{dck}\)</td></tr>
+          <tr><th>NB ↔ LR</th><td>Same softmax-of-linear form; NB fits the joint, LR the conditional.</td><td>\(\beta_{c,dk}=\log\theta_{dck},\;\gamma_c=\log\pi_c\)</td></tr>
+          <tr><th>Discriminative +</th><td>Accuracy with lots of data, any preprocessing, better calibration.</td><td>\(p(y\mid\phi(\mathbf x))\)</td></tr>
+          <tr><th>Generative +</th><td>Easy fitting, missing inputs, add classes, unlabeled data, maybe robustness.</td><td>\(p(y)\,p(\mathbf x\mid y)\)</td></tr>
+          <tr><th>Missing x₁</th><td>Drop its factor. Don't fill it with a guess.</td><td>\(\sum_{x_1}p(x_1\mid\theta_{1c})=1\)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <footer>Built as a study companion for Murphy, <i>Probabilistic Machine Learning: An Introduction</i> (MIT Press, CC-BY-NC-ND), §9.3–9.4. The emails, mini-digits, fruit and Gaussian data are synthetic, generated in the page from fixed seeds. Figure 9.8's densities are adapted in spirit from Bishop (2006), Figure 1.27.</footer>
+</section>
+</main>
+</div>
+
+<script>
+(function () {
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function txt(parent, x, y, s, cls, extra) { const t = el('text', Object.assign({ x, y, class: cls || 'ax' }, extra || {}), parent); t.textContent = s; return t; }
+const lin = (d0, d1, r0, r1) => v => r0 + (v - d0) / (d1 - d0) * (r1 - r0);
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const f2 = v => (Math.abs(v) < 1e-12 ? 0 : v).toFixed(2), f3 = v => (Math.abs(v) < 1e-12 ? 0 : v).toFixed(3);
+const pct = v => (100 * v).toFixed(v > 0.999 || v < 0.001 ? 2 : 1) + '%';
+const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
+const sci = v => !(v > 0) ? String(v === 0 ? 0 : v) : v >= 1e-3 ? v.toPrecision(3) : (([m, e]) => m + '×10' + e.replace('+', '').split('').map(ch => SUP[ch]).join(''))(v.toExponential(2).split('e'));
+const pathOf = pts => pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join('');
+const svgPt = (svg, evt) => { const p = svg.createSVGPoint(); p.x = evt.clientX; p.y = evt.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
+const sigmoid = z => 1 / (1 + Math.exp(-z));
+const LOG2PI = Math.log(2 * Math.PI);
+const lnorm = (x, m, s) => -0.5 * LOG2PI - Math.log(s) - 0.5 * ((x - m) / s) ** 2;
+const npdf = (x, m, s) => Math.exp(lnorm(x, m, s));
+const Phi = z => { const t = 1 / (1 + 0.2316419 * Math.abs(z)), d = 0.3989423 * Math.exp(-z * z / 2); const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return z > 0 ? 1 - p : p; };
+function lgamma(x) { const g = 7, c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7]; if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x); x -= 1; let a = c[0]; const t = x + g + 0.5; for (let i = 1; i < 9; i++) a += c[i] / (x + i); return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a); }
+function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss(r) { let u = 0; while (!u) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); }
+const hexRgb = h => { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
+const renderers = [];
+const pbar = (node, p, ls, lh) => { node.innerHTML = `<div class="s" style="flex:0 0 ${(100 * p).toFixed(2)}%">${p >= 0.14 ? (ls || 'spam') + ' ' + pct(p) : ''}</div><div class="h" style="flex:1 1 0">${1 - p >= 0.14 ? (lh || 'ham') + ' ' + pct(1 - p) : ''}</div>`; };
+
+/* ---------- levels ---------- */
+const LEVELS = { 1: 'Kid', 2: 'High school', 3: 'Undergrad', 4: 'Grad / MLE' };
+let level = 3;
+try { const s = localStorage.getItem('nb-lab-level'); if (s && LEVELS[s]) level = +s; } catch (e) {}
+$$('[data-lv]').forEach(card => {
+  const kids = [...card.children];
+  const tabs = document.createElement('div'); tabs.className = 'lvtabs'; tabs.setAttribute('role', 'tablist');
+  tabs.innerHTML = Object.entries(LEVELS).map(([k, v]) => `<button role="tab" data-tab="${k}">${v}</button>`).join('');
+  const body = document.createElement('div'); body.className = 'lvbody';
+  kids.forEach(k => body.appendChild(k));
+  card.appendChild(tabs); card.appendChild(body);
+  tabs.addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) showCard(card, +b.dataset.tab); });
+});
+function showCard(card, l) {
+  $$('.lvbody > [data-l]', card).forEach(d => { d.hidden = +d.dataset.l !== l; });
+  $$('[data-tab]', card).forEach(b => { b.classList.toggle('on', +b.dataset.tab === l); b.setAttribute('aria-selected', +b.dataset.tab === l); });
+}
+function setLevel(l) {
+  level = l; try { localStorage.setItem('nb-lab-level', l); } catch (e) {}
+  $$('[data-lv]').forEach(c => showCard(c, l));
+  $$('[data-setl]').forEach(b => b.classList.toggle('on', +b.dataset.setl === l));
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-setl]'); if (b) setLevel(+b.dataset.setl); });
+setLevel(level);
+
+/* ---------- score ---------- */
+const SCORE = { right: 0, total: 0, paint() { $('#score').innerHTML = `Quiz <b>${this.right}</b> / ${this.total}`; } };
+
+/* =====================================================================
+   Shared spam data + model
+   ===================================================================== */
+const WORDS = ['free', 'money', 'winner', 'click', 'meeting', 'lunch'];
+const D = WORDS.length;
+const DATA0 = [
+  [1, [1, 1, 0, 1, 0, 0]], [1, [1, 0, 1, 1, 0, 0]], [1, [0, 1, 1, 0, 0, 0]], [1, [1, 1, 1, 1, 0, 0]], [1, [1, 0, 0, 1, 0, 1]],
+  [0, [0, 0, 0, 0, 1, 1]], [0, [0, 0, 0, 0, 1, 0]], [0, [1, 0, 0, 0, 0, 1]], [0, [0, 1, 0, 0, 1, 0]], [0, [0, 0, 0, 1, 1, 0]], [0, [0, 0, 0, 0, 0, 1]], [0, [0, 0, 0, 0, 1, 1]]
+];
+let DATA = DATA0.map(([y, x]) => [y, x.slice()]);
+const dataListeners = [];
+const dataChanged = () => dataListeners.forEach(f => f());
+function counts() {
+  const c = { N: DATA.length, N1: 0, N0: 0, n1: new Array(D).fill(0), n0: new Array(D).fill(0) };
+  DATA.forEach(([y, x]) => { if (y) c.N1++; else c.N0++; x.forEach((v, d) => { if (v) (y ? c.n1 : c.n0)[d]++; }); });
+  return c;
+}
+// posterior-mean model with pseudo-count b on every count (b = 0 is the MLE; may produce NaN for empty classes)
+function model(b) {
+  const c = counts();
+  return { b, c, pi1: (c.N1 + b) / (c.N + 2 * b), th1: c.n1.map(n => (n + b) / (c.N1 + 2 * b)), th0: c.n0.map(n => (n + b) / (c.N0 + 2 * b)) };
+}
+// x[d] in {1, 0, null (missing)}
+function score(m, x) {
+  const f1 = [], f0 = [];
+  x.forEach((v, d) => { if (v === null) { f1.push(1); f0.push(1); } else { f1.push(v ? m.th1[d] : 1 - m.th1[d]); f0.push(v ? m.th0[d] : 1 - m.th0[d]); } });
+  const s1 = f1.reduce((a, b) => a * b, m.pi1), s0 = f0.reduce((a, b) => a * b, 1 - m.pi1);
+  return { f1, f0, s1, s0, p: s1 / (s1 + s0) };
+}
+function wordChips(node, state, opts) {
+  opts = opts || {};
+  function draw() {
+    node.innerHTML = WORDS.map((w, d) => { const v = state[d]; const cls = v === null ? 'word unk' : v ? 'word on' : 'word'; return `<button class="${cls}" data-d="${d}" aria-pressed="${v === 1}">${v === null ? '? ' : ''}${w}${v === null ? '<small>unknown</small>' : ''}</button>`; }).join('');
+  }
+  node.addEventListener('click', e => {
+    const b = e.target.closest('[data-d]'); if (!b) return; const d = +b.dataset.d;
+    if (opts.tri) state[d] = state[d] === 1 ? 0 : state[d] === 0 ? null : 1; else state[d] = state[d] ? 0 : 1;
+    draw(); opts.onchange && opts.onchange();
+  });
+  draw();
+  return draw;
+}
+
+/* =====================================================================
+   9.3  Spam filter
+   ===================================================================== */
+(function () {
+  const x = [1, 0, 0, 1, 0, 0];
+  const svg = $('#nb-ledger');
+  const redrawChips = wordChips($('#nb-words'), x, { onchange: render });
+  $$('[data-nbx]').forEach(b => b.addEventListener('click', () => { b.dataset.nbx.split(',').forEach((v, d) => x[d] = +v); redrawChips(); render(); }));
+  function render() {
+    const m = model(1), s = score(m, x);
+    const row = (lab, a, b, extra) => `<tr><td>${lab}</td><td class="s">${a}</td><td class="h">${b}</td><td class="${extra.cls || ''}">${extra.v}</td></tr>`;
+    const lr = (a, b) => Math.log(a / b);
+    let h = `<thead><tr><th>factor</th><th>spam</th><th>ham</th><th>vote log(spam/ham)</th></tr></thead><tbody>`;
+    h += row('prior π', f3(m.pi1), f3(1 - m.pi1), { v: (lr(m.pi1, 1 - m.pi1) >= 0 ? '+' : '') + f2(lr(m.pi1, 1 - m.pi1)) });
+    WORDS.forEach((w, d) => {
+      const v = lr(s.f1[d], s.f0[d]);
+      h += row(`${x[d] ? '“' + w + '” present: θ' : '“' + w + '” absent: 1−θ'}`, f3(s.f1[d]), f3(s.f0[d]), { v: (v >= 0 ? '+' : '') + f2(v), cls: x[d] ? '' : 'mu' });
+    });
+    h += `<tr class="tot"><td>score = product</td><td class="s">${sci(s.s1)}</td><td class="h">${sci(s.s0)}</td><td>${(Math.log(s.s1 / s.s0) >= 0 ? '+' : '') + f2(Math.log(s.s1 / s.s0))}</td></tr></tbody>`;
+    $('#nb-table').innerHTML = h;
+    pbar($('#nb-bar'), s.p);
+    // ledger
+    svg.innerHTML = '';
+    const rows = [['prior', lr(m.pi1, 1 - m.pi1), true]].concat(WORDS.map((w, d) => [(x[d] ? '' : 'no ') + w, lr(s.f1[d], s.f0[d]), x[d]]));
+    const tot = rows.reduce((a, r) => a + r[1], 0);
+    const R = Math.max(3, ...rows.map(r => Math.abs(r[1])), Math.abs(tot)) * 1.08;
+    const W = 640, ml = 110, mr = 60, X = lin(-R, R, ml, W - mr), rh = 24, y0 = 10;
+    el('line', { x1: X(0), x2: X(0), y1: 2, y2: y0 + (rows.length + 1) * rh + 4, class: 'base' }, svg);
+    rows.concat([['total log-odds', tot, true]]).forEach(([lab, v, on], i) => {
+      const y = y0 + i * rh + (i === rows.length ? 6 : 0);
+      if (i === rows.length) el('line', { x1: ml - 100, x2: W - 10, y1: y - 4, y2: y - 4, class: 'grid' }, svg);
+      txt(svg, ml - 8, y + 14, lab, i === rows.length ? 'lbl' : 'axl', { 'text-anchor': 'end', fill: on ? 'var(--ink)' : 'var(--muted)' });
+      const c = v >= 0 ? 'var(--spam)' : 'var(--ham)';
+      el('rect', { x: Math.min(X(0), X(v)), y: y + 3, width: Math.abs(X(v) - X(0)), height: rh - 8, rx: 2, fill: c, opacity: i === rows.length ? 1 : on ? .85 : .45 }, svg);
+      txt(svg, v >= 0 ? X(v) + 5 : X(v) - 5, y + 14, (v >= 0 ? '+' : '') + f2(v), 'ax', { 'text-anchor': v >= 0 ? 'start' : 'end' });
+    });
+    txt(svg, X(R * 0.6), 226, 'toward spam →', 'ax', { 'text-anchor': 'middle', fill: 'var(--spam)' });
+    txt(svg, X(-R * 0.6), 226, '← toward ham', 'ax', { 'text-anchor': 'middle', fill: 'var(--ham)' });
+  }
+  dataListeners.push(render);
+  render();
+})();
+
+/* =====================================================================
+   9.3.1  Model-type tabs
+   ===================================================================== */
+$('#mt-seg').addEventListener('click', e => {
+  const b = e.target.closest('[data-mt]'); if (!b) return;
+  $$('#mt-seg button').forEach(x => x.classList.toggle('on', x === b));
+  $$('[data-mtp]').forEach(p => { p.hidden = p.dataset.mtp !== b.dataset.mt; });
+  renderers.forEach(f => f());
+});
+
+/* ---------- mini-digits (shared with 9.4.3) ---------- */
+const DG = (function () {
+  const T = [
+    ['01110', '10001', '10011', '10101', '11001', '10001', '01110'], ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+    ['01110', '10001', '00001', '00010', '00100', '01000', '11111'], ['11111', '00010', '00100', '00010', '00001', '10001', '01110'],
+    ['00010', '00110', '01010', '10010', '11111', '00010', '00010'], ['11111', '10000', '11110', '00001', '00001', '10001', '01110'],
+    ['00110', '01000', '10000', '11110', '10001', '10001', '01110'], ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
+    ['01110', '10001', '10001', '01110', '10001', '10001', '01110'], ['01110', '10001', '10001', '01111', '00001', '00010', '01100']
+  ];
+  const W = 7, H = 9, P = W * H;
+  function gen(r, c) {
+    const img = new Array(P).fill(0);
+    const dx = r() < 0.65 ? 0 : (r() < 0.5 ? -1 : 1), dy = r() < 0.8 ? 0 : (r() < 0.5 ? -1 : 1), thick = r() < 0.2;
+    T[c].forEach((row, i) => row.split('').forEach((ch, j) => {
+      if (ch !== '1') return;
+      const y = i + 1 + dy, x = j + 1 + dx;
+      if (y >= 0 && y < H && x >= 0 && x < W) img[y * W + x] = 1;
+      if (thick && x + 1 < W && y >= 0 && y < H) img[y * W + x + 1] = 1;
+    }));
+    for (let p = 0; p < P; p++) if (r() < 0.035) img[p] = 1 - img[p];
+    return img;
+  }
+  const r = rng(11), NTR = 60;
+  const theta = [];
+  for (let c = 0; c < 10; c++) { const cnt = new Array(P).fill(0); for (let n = 0; n < NTR; n++) gen(r, c).forEach((v, p) => cnt[p] += v); theta.push(cnt.map(v => (v + 1) / (NTR + 2))); }
+  const lt = theta.map(t => t.map(Math.log)), l1t = theta.map(t => t.map(v => Math.log(1 - v)));
+  const rt = rng(22), test = [];
+  for (let n = 0; n < 500; n++) { const c = n % 10; test.push({ c, x: gen(rt, c) }); }
+  // log p(x|c) + log pi; vis = optional boolean mask of observed pixels; on = included classes
+  function logpost(x, on, vis) {
+    const nOn = on.filter(Boolean).length;
+    const lp = on.map((o, c) => { if (!o) return -Infinity; let s = Math.log(1 / nOn); for (let p = 0; p < P; p++) if (!vis || vis[p]) s += x[p] ? lt[c][p] : l1t[c][p]; return s; });
+    const mx = Math.max(...lp), z = lp.reduce((a, v) => a + (v === -Infinity ? 0 : Math.exp(v - mx)), 0);
+    const post = lp.map(v => v === -Infinity ? 0 : Math.exp(v - mx) / z);
+    let top = 0; post.forEach((v, c) => { if (v > post[top]) top = c; });
+    return { lp, post, top };
+  }
+  function drawImg(svg, x, opts) {
+    opts = opts || {}; svg.innerHTML = ''; const s = opts.cell || 20;
+    el('rect', { x: 0, y: 0, width: W * s, height: H * s, fill: 'var(--surface)', stroke: 'var(--rule)' }, svg);
+    for (let p = 0; p < P; p++) {
+      const v = x[p], i = Math.floor(p / W), j = p % W;
+      const fill = opts.color ? opts.color(p) : 'var(--ink)', op = opts.opacity ? opts.opacity(p) : v;
+      if (op > 0.003) el('rect', { x: j * s + (opts.gap || 0), y: i * s + (opts.gap || 0), width: s - 2 * (opts.gap || 0), height: s - 2 * (opts.gap || 0), fill, opacity: op.toFixed(3) }, svg);
+      if (opts.grid) el('rect', { x: j * s, y: i * s, width: s, height: s, fill: 'none', stroke: 'var(--rule)', 'stroke-width': .6 }, svg);
+    }
+  }
+  function postBars(node, post, on, extra) {
+    let top = 0; post.forEach((v, c) => { if (v > post[top]) top = c; });
+    node.innerHTML = post.map((v, c) => `<div class="r${c === top ? ' top' : ''}${on && !on[c] ? ' off' : ''}"><span>${c}</span><div class="bar"><i style="width:${(100 * v).toFixed(1)}%"></i></div><span class="v">${v < 0.0005 && v > 0 ? '<0.1%' : pct(v)}</span></div>`).join('') + (extra || '');
+  }
+  return { W, H, P, theta, lt, l1t, test, logpost, drawImg, postBars, gen };
+})();
+
+(function () {
+  const { W, H, P, theta, lt, l1t, test, logpost, drawImg, postBars } = DG;
+  const on = new Array(10).fill(true);
+  let x = test[3].x.slice(), truth = 3;
+  const thetaBox = $('#dg-thetas'), cls = $('#dg-cls'), draw = $('#dg-draw');
+  thetaBox.innerHTML = theta.map((t, c) => `<figure data-c="${c}"><svg viewBox="0 0 70 90" aria-label="theta for digit ${c}"></svg><figcaption>${c}</figcaption></figure>`).join('');
+  $$('figure', thetaBox).forEach((f, c) => drawImg($('svg', f), theta[c], { cell: 10 }));
+  cls.innerHTML = on.map((_, c) => `<button class="on" data-c="${c}" aria-pressed="true">${c}</button>`).join('');
+  cls.addEventListener('click', e => {
+    const b = e.target.closest('[data-c]'); if (!b) return; const c = +b.dataset.c;
+    if (on[c] && on.filter(Boolean).length <= 2) return;
+    on[c] = !on[c]; b.classList.toggle('on', on[c]); b.setAttribute('aria-pressed', on[c]);
+    $(`figure[data-c="${c}"]`, thetaBox).classList.toggle('off', !on[c]);
+    render(); renderAcc();
+  });
+  let painting = null;
+  function cellAt(evt) { const p = svgPt(draw, evt); const j = Math.floor(p.x / 20), i = Math.floor(p.y / 20); return (i >= 0 && i < H && j >= 0 && j < W) ? i * W + j : -1; }
+  draw.addEventListener('pointerdown', e => { const p = cellAt(e); if (p < 0) return; painting = 1 - x[p]; x[p] = painting; truth = null; draw.setPointerCapture(e.pointerId); render(); });
+  draw.addEventListener('pointermove', e => { if (painting === null) return; const p = cellAt(e); if (p >= 0 && x[p] !== painting) { x[p] = painting; render(); } });
+  const stop = () => { painting = null; };
+  draw.addEventListener('pointerup', stop); draw.addEventListener('pointercancel', stop);
+  const rr = rng(5);
+  $('#dg-rand').addEventListener('click', () => { const t = test[Math.floor(rr() * test.length)]; x = t.x.slice(); truth = t.c; render(); });
+  $('#dg-clear').addEventListener('click', () => { x = new Array(P).fill(0); truth = null; render(); });
+  function render() {
+    drawImg(draw, x, { grid: true, gap: 1 });
+    const r = logpost(x, on);
+    postBars($('#dg-post'), r.post, on);
+    $('#dg-top').textContent = r.top + ' (' + pct(r.post[r.top]) + ')';
+    $('#dg-true').textContent = truth === null ? 'your drawing' : `test image, true label ${truth}${on[truth] ? '' : ' (class removed!)'}`;
+    let sec = -1; r.post.forEach((v, c) => { if (c !== r.top && on[c] && (sec < 0 || v > r.post[sec])) sec = c; });
+    $('#dg-whycap').textContent = `why: each pixel's vote, ${r.top} (green) vs runner-up ${sec} (red)`;
+    const vote = x.map((v, p) => v ? lt[r.top][p] - lt[sec][p] : l1t[r.top][p] - l1t[sec][p]);
+    const mx = Math.max(...vote.map(Math.abs), 1e-9);
+    drawImg($('#dg-why'), x, { grid: true, color: p => vote[p] >= 0 ? 'var(--green)' : 'var(--spam)', opacity: p => Math.abs(vote[p]) / mx });
+  }
+  function renderAcc() {
+    let n = 0, ok = 0;
+    test.forEach(t => { if (!on[t.c]) return; n++; if (logpost(t.x, on).top === t.c) ok++; });
+    $('#dg-acc').textContent = pct(ok / n);
+    const C = on.filter(Boolean).length; $('#dg-np').textContent = (C * P + C - 1).toLocaleString();
+    const samp = $('#dg-samples'); samp.innerHTML = '';
+    [10, 21, 32, 43, 54, 65, 76, 87, 98, 109].forEach(i => {
+      const t = test[i], f = document.createElement('figure');
+      const pr = logpost(t.x, on).top;
+      f.innerHTML = `<svg viewBox="0 0 70 90"></svg><figcaption style="color:${pr === t.c ? 'var(--ink)' : 'var(--spam)'};font-weight:600">${pr}</figcaption>`;
+      samp.appendChild(f); drawImg($('svg', f), t.x, { cell: 10 });
+    });
+  }
+  render(); renderAcc();
+})();
+
+/* ---------- categorical: fruit ---------- */
+(function () {
+  const C = [{ n: 'apple', c: '--spam', pi: .45 }, { n: 'banana', c: '--gap', pi: .35 }, { n: 'lime', c: '--k3', pi: .20 }];
+  const F = [
+    { n: 'color', v: ['red', 'yellow', 'green'], t: [[.6, .15, .25], [.02, .88, .10], [.02, .08, .90]] },
+    { n: 'shape', v: ['round', 'long'], t: [[.95, .05], [.05, .95], [.97, .03]] },
+    { n: 'size', v: ['small', 'medium', 'large'], t: [[.15, .70, .15], [.10, .40, .50], [.80, .18, .02]] }
+  ];
+  const x = [2, 0, 1];
+  const sel = $('#ct-sel');
+  sel.innerHTML = F.map((f, d) => `<span class="lab">${f.n}</span><select data-d="${d}" aria-label="${f.n}">${f.v.map((v, k) => `<option value="${k}"${k === x[d] ? ' selected' : ''}>${v}</option>`).join('')}</select>`).join('<span class="sep"></span>');
+  sel.addEventListener('change', e => { const s = e.target.closest('select'); if (s) { x[+s.dataset.d] = +s.value; render(); } });
+  function render() {
+    let h = `<thead><tr><th>feature = value</th>${C.map(c => `<th style="color:var(${c.c})">${c.n}: θ<sub>dck</sub></th>`).join('')}</tr></thead><tbody>`;
+    h += `<tr><td>prior π<sub>c</sub></td>${C.map(c => `<td>${f2(c.pi)}</td>`).join('')}</tr>`;
+    F.forEach((f, d) => {
+      h += `<tr><td>${f.n} = <b>${f.v[x[d]]}</b></td>${C.map((c, ci) => `<td><span style="display:inline-flex;gap:2px;vertical-align:middle;margin-right:8px">${f.t[ci].map((v, k) => `<i style="display:inline-block;width:8px;height:${Math.max(2, 18 * v).toFixed(0)}px;align-self:flex-end;background:var(${c.c});opacity:${k === x[d] ? 1 : .25}"></i>`).join('')}</span>${f2(f.t[ci][x[d]])}</td>`).join('')}</tr>`;
+    });
+    const sc = C.map((c, ci) => F.reduce((a, f, d) => a * f.t[ci][x[d]], c.pi)), Z = sc.reduce((a, b) => a + b, 0);
+    h += `<tr class="tot"><td>π × Πθ</td>${sc.map(v => `<td>${sci(v)}</td>`).join('')}</tr></tbody>`;
+    $('#ct-table').innerHTML = h;
+    $('#ct-post').innerHTML = C.map((c, ci) => `<div class="stat"><div class="k">p(${c.n} | x)</div><div class="v" style="color:var(${c.c})">${pct(sc[ci] / Z)}</div></div>`).join('');
+  }
+  render();
+})();
+
+/* ---------- Gaussian NB in 2-D ---------- */
+(function () {
+  const svg = $('#gn-plot'), W = 520, H = 400, m = { l: 36, r: 16, t: 10, b: 26 };
+  const X = lin(-4.5, 4.5, m.l, W - m.r), Y = lin(-3.5, 3.5, H - m.b, m.t), Xi = lin(m.l, W - m.r, -4.5, 4.5), Yi = lin(H - m.b, m.t, -3.5, 3.5);
+  const MU = [[-1.7, -0.7], [1.6, -1.0], [0.1, 1.6]], SD = [[0.9, 0.75], [0.7, 0.95], [1.1, 0.6]], SG = [1, -1, 1];
+  const COL = ['--spam', '--ham', '--k3'];
+  let rho = 0, mode = 'nb', seed = 3, pts = [], fit = [], q = [0.3, -0.3];
+  function sample() {
+    const r = rng(seed); pts = [];
+    MU.forEach((mu, c) => { const p = rho * SG[c]; for (let i = 0; i < 40; i++) { const z1 = gauss(r), z2 = gauss(r); pts.push({ c, x: [mu[0] + SD[c][0] * z1, mu[1] + SD[c][1] * (p * z1 + Math.sqrt(1 - p * p) * z2)] }); } });
+  }
+  function doFit() {
+    fit = [0, 1, 2].map(c => {
+      const xs = pts.filter(p => p.c === c).map(p => p.x), n = xs.length;
+      const mu = [0, 1].map(d => xs.reduce((s, x) => s + x[d], 0) / n);
+      let a = 0, b = 0, cc = 0; xs.forEach(x => { const u = x[0] - mu[0], v = x[1] - mu[1]; a += u * u; b += u * v; cc += v * v; });
+      a /= n; b /= n; cc /= n; if (mode === 'nb') b = 0;
+      const det = a * cc - b * b;
+      return { pi: n / pts.length, mu, S: [a, b, cc], det, inv: [cc / det, -b / det, a / det] };
+    });
+  }
+  function logp(x, f) { const u = x[0] - f.mu[0], v = x[1] - f.mu[1]; return Math.log(f.pi) - LOG2PI - 0.5 * Math.log(f.det) - 0.5 * (f.inv[0] * u * u + 2 * f.inv[1] * u * v + f.inv[2] * v * v); }
+  function post(x) { const l = fit.map(f => logp(x, f)), mx = Math.max(...l), e = l.map(v => Math.exp(v - mx)), z = e.reduce((a, b) => a + b, 0); return e.map(v => v / z); }
+  const cv = document.createElement('canvas'); cv.width = 117; cv.height = 91;
+  function render() {
+    if ($('[data-mtp="gau"]').hidden) return;
+    svg.innerHTML = '';
+    const ctx = cv.getContext('2d'), img = ctx.createImageData(cv.width, cv.height), rgb = COL.map(c => hexRgb(cssv(c))), bg = hexRgb(cssv('--surface'));
+    for (let i = 0; i < cv.height; i++) for (let j = 0; j < cv.width; j++) {
+      const x = [Xi(m.l + (j + .5) / cv.width * (W - m.l - m.r)), Yi(m.t + (i + .5) / cv.height * (H - m.t - m.b))];
+      const p = post(x); let k = 0; p.forEach((v, c) => { if (v > p[k]) k = c; });
+      const a = 0.12 + 0.2 * (p[k] - 1 / 3) * 1.5, o = (i * cv.width + j) * 4;
+      for (let t = 0; t < 3; t++) img.data[o + t] = Math.round(bg[t] * (1 - a) + rgb[k][t] * a);
+      img.data[o + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    el('image', { href: cv.toDataURL(), x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, preserveAspectRatio: 'none', style: 'image-rendering:pixelated' }, svg);
+    for (let v = -4; v <= 4; v += 2) txt(svg, X(v), H - m.b + 16, v, 'ax', { 'text-anchor': 'middle' });
+    for (let v = -3; v <= 3; v += 1) txt(svg, m.l - 6, Y(v) + 4, v, 'ax', { 'text-anchor': 'end' });
+    txt(svg, W - m.r - 4, H - m.b - 6, 'x₁', 'axl', { 'text-anchor': 'end' }); txt(svg, m.l + 6, m.t + 14, 'x₂', 'axl');
+    el('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: 'none', stroke: 'var(--rule)' }, svg);
+    const sx = X(1) - X(0);
+    fit.forEach((f, c) => {
+      const [a, b, cc] = f.S, tr = (a + cc) / 2, df = Math.sqrt(((a - cc) / 2) ** 2 + b * b), l1 = tr + df, l2 = Math.max(tr - df, 1e-9);
+      const ang = 0.5 * Math.atan2(2 * b, a - cc) * 180 / Math.PI;
+      [1, 2].forEach(k => el('ellipse', { cx: X(f.mu[0]), cy: Y(f.mu[1]), rx: k * Math.sqrt(l1) * sx, ry: k * Math.sqrt(l2) * sx, transform: `rotate(${-ang} ${X(f.mu[0])} ${Y(f.mu[1])})`, fill: 'none', stroke: `var(${COL[c]})`, 'stroke-width': k === 1 ? 2.2 : 1.4, 'stroke-dasharray': k === 2 ? '5 4' : '' }, svg));
+    });
+    pts.forEach(p => el('circle', { cx: X(p.x[0]), cy: Y(p.x[1]), r: 3.2, fill: `var(${COL[p.c]})`, 'fill-opacity': .8, stroke: 'var(--surface)', 'stroke-width': .8 }, svg));
+    fit.forEach((f, c) => el('path', { d: `M${X(f.mu[0]) - 7},${Y(f.mu[1])}h14M${X(f.mu[0])},${Y(f.mu[1]) - 7}v14`, stroke: 'var(--ink)', 'stroke-width': 2.5 }, svg));
+    el('circle', { cx: X(q[0]), cy: Y(q[1]), r: 7, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.5 }, svg);
+    el('circle', { cx: X(q[0]), cy: Y(q[1]), r: 2, fill: 'var(--ink)' }, svg);
+    const p = post(q);
+    let ok = 0; pts.forEach(pt => { const pp = post(pt.x); let k = 0; pp.forEach((v, c) => { if (v > pp[k]) k = c; }); if (k === pt.c) ok++; });
+    $('#gn-read').innerHTML = p.map((v, c) => `<div class="stat"><div class="k">p(class ${c + 1} | ○)</div><div class="v" style="color:var(${COL[c]})">${pct(v)}</div></div>`).join('') +
+      `<div class="stat g"><div class="k">training accuracy</div><div class="v">${pct(ok / pts.length)}</div></div><div class="stat"><div class="k">covariance params</div><div class="v">${mode === 'nb' ? '3 × 2 = 6' : '3 × 3 = 9'}</div></div>`;
+  }
+  svg.addEventListener('click', e => { const p = svgPt(svg, e); q = [Math.max(-4.5, Math.min(4.5, Xi(p.x))), Math.max(-3.5, Math.min(3.5, Yi(p.y)))]; render(); });
+  const rs = $('#gn-rho'), ro = $('#gn-rho-o');
+  rs.addEventListener('input', () => { rho = +rs.value; ro.textContent = f2(rho); sample(); doFit(); render(); });
+  $('#gn-seg').addEventListener('click', e => { const b = e.target.closest('[data-gm]'); if (!b) return; mode = b.dataset.gm; $$('#gn-seg button').forEach(x => x.classList.toggle('on', x === b)); doFit(); render(); });
+  $('#gn-new').addEventListener('click', () => { seed++; sample(); doFit(); render(); });
+  ro.textContent = f2(rho); sample(); doFit();
+  renderers.push(render);
+})();
+
+/* =====================================================================
+   9.3.2  Training table
+   ===================================================================== */
+(function () {
+  const tbl = $('#fit-data'), svg = $('#fit-dots');
+  function render() {
+    tbl.innerHTML = `<thead><tr><th>#</th><th>label</th>${WORDS.map(w => `<th style="text-align:center">${w}</th>`).join('')}</tr></thead><tbody>` +
+      DATA.map(([y, x], n) => `<tr><td class="mu">${n + 1}</td><td class="lab ${y ? 's' : 'h'}" data-n="${n}" role="button" tabindex="0">${y ? 'spam' : 'ham'}</td>${x.map((v, d) => `<td class="cell${v ? ' on' : ''}" data-n="${n}" data-d="${d}" role="button" tabindex="0" aria-label="${WORDS[d]} ${v ? 'present' : 'absent'}">${v ? '✓' : '·'}</td>`).join('')}</tr>`).join('') + '</tbody>';
+    const m = model(0), c = m.c;
+    const fr = (n, N) => N ? `${n}/${N} = ${f2(n / N)}` : `${n}/0 = ?`;
+    $('#fit-est').innerHTML = `<thead><tr><th>estimate</th><th>spam</th><th>ham</th></tr></thead><tbody>` +
+      `<tr><td>N<sub>c</sub></td><td class="s">${c.N1}</td><td class="h">${c.N0}</td></tr>` +
+      `<tr><td>π̂<sub>c</sub> = N<sub>c</sub>/N</td><td class="s">${fr(c.N1, c.N)}</td><td class="h">${fr(c.N0, c.N)}</td></tr>` +
+      WORDS.map((w, d) => { const z1 = c.N1 && (c.n1[d] === 0 || c.n1[d] === c.N1), z0 = c.N0 && (c.n0[d] === 0 || c.n0[d] === c.N0); return `<tr><td>θ̂ ${w}</td><td class="${z1 ? 'a' : 's'}">${z1 ? '⚠ ' : ''}${fr(c.n1[d], c.N1)}</td><td class="${z0 ? 'a' : 'h'}">${z0 ? '⚠ ' : ''}${fr(c.n0[d], c.N0)}</td></tr>`; }).join('') + '</tbody>';
+    const zs = []; WORDS.forEach((w, d) => { if (c.N1 && c.n1[d] === 0) zs.push(`“${w}” never in spam`); if (c.N0 && c.n0[d] === 0) zs.push(`“${w}” never in ham`); });
+    $('#fit-chain').innerHTML = `Parameters fitted: 1 prior + ${2 * D} word probabilities = ${1 + 2 * D}. One pass over the table.<br>` +
+      (zs.length ? `<span class="a">Zero counts:</span> ${zs.join(', ')}. Under the MLE, one such word in a test email rules that class out completely.` : `<span class="ok">No zero counts right now.</span>`);
+    svg.innerHTML = '';
+    const ml = 80, W = 640, X = lin(0, 1, ml, W - 30), rh = 28;
+    [0, .25, .5, .75, 1].forEach(v => { el('line', { x1: X(v), x2: X(v), y1: 4, y2: D * rh + 4, class: 'grid' }, svg); txt(svg, X(v), D * rh + 18, v, 'ax', { 'text-anchor': 'middle' }); });
+    WORDS.forEach((w, d) => {
+      const y = 4 + d * rh + rh / 2;
+      txt(svg, ml - 10, y + 4, w, 'axl', { 'text-anchor': 'end' });
+      [[m.th1[d], '--spam', c.N1], [m.th0[d], '--ham', c.N0]].forEach(([t, col, N], k) => {
+        if (!N) return;
+        const yy = y + (k ? 4 : -4);
+        el('circle', { cx: X(t), cy: yy, r: 6, fill: `var(${col})` }, svg);
+        if (t === 0 || t === 1) txt(svg, X(t) + (t ? -12 : 12), yy + 4, '⚠', 'lbl', { fill: 'var(--gap)', 'text-anchor': 'middle' });
+      });
+    });
+  }
+  function act(e) {
+    const t = e.target.closest('[data-n]'); if (!t) return;
+    const n = +t.dataset.n;
+    if (t.dataset.d !== undefined) DATA[n][1][+t.dataset.d] ^= 1; else DATA[n][0] ^= 1;
+    if (DATA.filter(r => r[0]).length === 0 || DATA.filter(r => !r[0]).length === 0) { DATA[n][0] ^= 1; return; }
+    dataChanged();
+    const again = $(`[data-n="${n}"]${t.dataset.d !== undefined ? `[data-d="${t.dataset.d}"]` : '.lab'}`, tbl); again && again.focus();
+  }
+  tbl.addEventListener('click', act);
+  tbl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(e); } });
+  $('#fit-reset').addEventListener('click', () => { DATA = DATA0.map(([y, x]) => [y, x.slice()]); dataChanged(); });
+  dataListeners.push(render);
+  render();
+})();
+
+/* =====================================================================
+   9.3.3  Bayesian NB / smoothing
+   ===================================================================== */
+(function () {
+  const x = [0, 0, 1, 0, 1, 0];
+  const bs = $('#by-b'), bo = $('#by-b-o'), wsel = $('#by-word'), csel = $('#by-cls');
+  wsel.innerHTML = WORDS.map((w, d) => `<option value="${d}"${d === 4 ? ' selected' : ''}>${w}</option>`).join('');
+  wordChips($('#by-words'), x, { onchange: render });
+  bs.addEventListener('input', render); wsel.addEventListener('change', render); csel.addEventListener('change', render);
+  $$('[data-byb]').forEach(b => b.addEventListener('click', () => { bs.value = b.dataset.byb; render(); }));
+  function render() {
+    const b = +bs.value; bo.textContent = b;
+    const m = model(b), m0 = model(0), c = m.c, s = score(m, x);
+    // dots
+    const svg = $('#by-dots'); svg.innerHTML = '';
+    const ml = 70, W = 400, X = lin(0, 1, ml, W - 14), rh = 34;
+    [0, .5, 1].forEach(v => { el('line', { x1: X(v), x2: X(v), y1: 4, y2: D * rh + 4, class: 'grid', 'stroke-dasharray': v === .5 ? '3 3' : '' }, svg); txt(svg, X(v), D * rh + 18, v, 'ax', { 'text-anchor': 'middle' }); });
+    WORDS.forEach((w, d) => {
+      const y = 4 + d * rh + rh / 2;
+      txt(svg, ml - 8, y + 4, w, 'axl', { 'text-anchor': 'end' });
+      [[m.th1[d], m0.th1[d], '--spam', -5], [m.th0[d], m0.th0[d], '--ham', 5]].forEach(([t, t0, col, dy]) => {
+        el('line', { x1: X(t0), x2: X(t), y1: y + dy, y2: y + dy, stroke: `var(${col})`, 'stroke-width': 1.5, opacity: .6 }, svg);
+        el('circle', { cx: X(t0), cy: y + dy, r: 5, fill: 'var(--surface)', stroke: `var(${col})`, 'stroke-width': 1.5 }, svg);
+        el('circle', { cx: X(t), cy: y + dy, r: 4.5, fill: `var(${col})` }, svg);
+      });
+    });
+    // beta posterior
+    const d = +wsel.value, k = +csel.value, N = k ? c.N1 : c.N0, n1 = k ? c.n1[d] : c.n0[d], a = b + n1, bb = b + N - n1;
+    const bsvg = $('#by-beta'); bsvg.innerHTML = '';
+    const BW = 400, BH = 200, mm = { l: 34, r: 10, t: 10, b: 26 }, BX = lin(0, 1, mm.l, BW - mm.r);
+    [0, .25, .5, .75, 1].forEach(v => txt(bsvg, BX(v), BH - mm.b + 16, v, 'ax', { 'text-anchor': 'middle' }));
+    el('line', { x1: mm.l, x2: BW - mm.r, y1: BH - mm.b, y2: BH - mm.b, class: 'base' }, bsvg);
+    const col = k ? '--spam' : '--ham';
+    if (a <= 0 || bb <= 0) {
+      txt(bsvg, BW / 2, 80, 'improper: Beta(' + f2(a) + ', ' + f2(bb) + ')', 'lbl', { 'text-anchor': 'middle', fill: 'var(--gap)' });
+      txt(bsvg, BW / 2, 100, 'β̆ = 0 with a zero count: all mass piles onto θ = ' + (a <= 0 ? '0' : '1'), 'ax', { 'text-anchor': 'middle' });
+    } else {
+      const lB = lgamma(a) + lgamma(bb) - lgamma(a + bb), xs = []; for (let t = 0.002; t < 0.999; t += 0.004) xs.push(t);
+      const ys = xs.map(t => Math.exp((a - 1) * Math.log(t) + (bb - 1) * Math.log(1 - t) - lB));
+      const ymax = Math.min(Math.max(...ys.slice(3, -3)) * 1.1, 14), BY = lin(0, ymax, BH - mm.b, mm.t);
+      el('path', { d: pathOf(xs.map((t, i) => [BX(t), BY(Math.min(ys[i], ymax))])) + `L${BX(xs[xs.length - 1])},${BY(0)}L${BX(xs[0])},${BY(0)}Z`, fill: `var(${col}-soft)`, stroke: `var(${col})`, 'stroke-width': 2 }, bsvg);
+      const mean = a / (a + bb), mle = N ? n1 / N : NaN;
+      el('line', { x1: BX(mean), x2: BX(mean), y1: mm.t, y2: BH - mm.b, stroke: 'var(--ink)', 'stroke-width': 1.5 }, bsvg);
+      txt(bsvg, BX(mean) + (mean > .7 ? -4 : 4), mm.t + 12, 'mean ' + f3(mean), 'lbl', { 'text-anchor': mean > .7 ? 'end' : 'start' });
+      if (!isNaN(mle)) { el('line', { x1: BX(mle), x2: BX(mle), y1: mm.t + 20, y2: BH - mm.b, stroke: 'var(--muted)', 'stroke-dasharray': '4 3', 'stroke-width': 1.5 }, bsvg); txt(bsvg, BX(mle) + (mle > .7 ? -4 : 4), mm.t + 32, 'MLE ' + f3(mle), 'ax', { 'text-anchor': mle > .7 ? 'end' : 'start' }); }
+      txt(bsvg, BW - mm.r, BH - mm.b - 8, `Beta(${f2(a)}, ${f2(bb)})`, 'ax', { 'text-anchor': 'end' });
+    }
+    // test email
+    const und = !(s.s1 + s.s0 > 0);
+    $('#by-post').textContent = und ? '0/0 ?' : pct(s.p);
+    $('#by-ss').textContent = sci(s.s1); $('#by-hs').textContent = sci(s.s0);
+    const zs = []; x.forEach((v, dd) => { const f1 = s.f1[dd], f0 = s.f0[dd]; if (f1 === 0) zs.push(`<span class="s">spam</span> factor for ${v ? '' : 'no '}“${WORDS[dd]}” = 0`); if (f0 === 0) zs.push(`<span class="h">ham</span> factor for ${v ? '' : 'no '}“${WORDS[dd]}” = 0`); });
+    $('#by-chain').innerHTML = (zs.length ? `<span class="a">Zero factors:</span> ${zs.join('; ')}.<br>` : '') +
+      (und ? `<span class="bad">Both scores are 0, so Eq. 9.47 is 0/0: the MLE model can't classify this email at all.</span>` :
+        (s.s1 === 0 || s.s0 === 0) ? `<span class="bad">One class is ruled out entirely by a single word.</span>` :
+          `<span class="ok">Every factor is positive, so both classes stay possible.</span> e.g. θ(“${WORDS[d]}” | ${k ? 'spam' : 'ham'}) = (${b} + ${n1}) / (${2 * b} + ${N}) = ${f3(a / (a + bb))}`);
+    // curve over b
+    const cs = $('#by-curve'); cs.innerHTML = '';
+    const CW = 640, CH = 160, cm = { l: 44, r: 12, t: 10, b: 26 }, CX = lin(0, 10, cm.l, CW - cm.r), CY = lin(0, 1, CH - cm.b, cm.t);
+    [0, .5, 1].forEach(v => { el('line', { x1: cm.l, x2: CW - cm.r, y1: CY(v), y2: CY(v), class: 'grid' }, cs); txt(cs, cm.l - 6, CY(v) + 4, v, 'ax', { 'text-anchor': 'end' }); });
+    for (let v = 0; v <= 10; v += 2) txt(cs, CX(v), CH - cm.b + 16, v, 'ax', { 'text-anchor': 'middle' });
+    txt(cs, CW - cm.r, CH - cm.b - 6, 'β̆', 'axl', { 'text-anchor': 'end' });
+    const pts = []; for (let v = 0.02; v <= 10.001; v += 0.04) { const sv = score(model(v), x); pts.push([CX(v), CY(sv.p)]); }
+    el('path', { d: pathOf(pts), fill: 'none', stroke: 'var(--spam)', 'stroke-width': 2.5 }, cs);
+    const s0v = score(model(0), x);
+    if (!(s0v.s1 + s0v.s0 > 0)) txt(cs, CX(0) + 6, CY(0.5) - 6, '0/0 at β̆ = 0', 'ax', { fill: 'var(--gap)' });
+    else el('circle', { cx: CX(0), cy: CY(s0v.p), r: 4, fill: 'var(--surface)', stroke: 'var(--spam)', 'stroke-width': 2 }, cs);
+    if (!und) el('circle', { cx: CX(b), cy: CY(s.p), r: 6, fill: 'var(--spam)', stroke: 'var(--surface)', 'stroke-width': 2 }, cs);
+  }
+  dataListeners.push(render);
+  render();
+})();
+
+/* =====================================================================
+   9.3.4  NB ↔ LR
+   ===================================================================== */
+(function () {
+  const x = [1, 0, 0, 0, 1, 0];
+  wordChips($('#lr-words'), x, { onchange: render });
+  function render() {
+    const m = model(1), s = score(m, x);
+    const w = WORDS.map((_, d) => Math.log(m.th1[d] * (1 - m.th0[d]) / (m.th0[d] * (1 - m.th1[d]))));
+    const w0 = Math.log(m.pi1 / (1 - m.pi1)) + WORDS.reduce((a, _, d) => a + Math.log((1 - m.th1[d]) / (1 - m.th0[d])), 0);
+    let z = w0;
+    let h = `<thead><tr><th>term</th><th>θ spam</th><th>θ ham</th><th>weight w</th><th>x</th><th>w·x</th></tr></thead><tbody>`;
+    h += `<tr><td>bias w₀</td><td class="mu">π=${f3(m.pi1)}</td><td class="mu">${f3(1 - m.pi1)}</td><td>${f3(w0)}</td><td>1</td><td>${f3(w0)}</td></tr>`;
+    WORDS.forEach((wd, d) => { z += w[d] * x[d]; h += `<tr><td>${wd}</td><td class="s">${f3(m.th1[d])}</td><td class="h">${f3(m.th0[d])}</td><td>${(w[d] >= 0 ? '+' : '') + f3(w[d])}</td><td>${x[d]}</td><td class="${x[d] ? '' : 'mu'}">${f3(w[d] * x[d])}</td></tr>`; });
+    h += `<tr class="tot"><td>z = w·x + w₀</td><td></td><td></td><td></td><td></td><td>${f3(z)}</td></tr></tbody>`;
+    $('#lr-table').innerHTML = h;
+    const plr = sigmoid(z);
+    $('#lr-nb').textContent = s.p.toFixed(6); $('#lr-lr').textContent = plr.toFixed(6);
+    $('#lr-diff').textContent = Math.abs(s.p - plr).toExponential(1);
+  }
+  dataListeners.push(render);
+  render();
+})();
+(function () {
+  const ids = ['m1', 's1', 'pi', 'm2', 's2'], inp = {};
+  ids.forEach(k => { inp[k] = $('#g1-' + k); inp[k].addEventListener('input', render); });
+  $('#g1-tie').addEventListener('click', () => { inp.s2.value = inp.s1.value; render(); });
+  const top = $('#g1-top'), bot = $('#g1-bot'), W = 640, m = { l: 44, r: 44, t: 10, b: 24 };
+  const X = lin(-5, 5, m.l, W - m.r), xs = []; for (let v = -5; v <= 5.0001; v += 0.025) xs.push(v);
+  function render() {
+    const P = {}; ids.forEach(k => { P[k] = +inp[k].value; inp[k].nextElementSibling.textContent = f2(P[k]); });
+    const A = -1 / (2 * P.s1 ** 2) + 1 / (2 * P.s2 ** 2), B = P.m1 / P.s1 ** 2 - P.m2 / P.s2 ** 2, C0 = -(P.m1 ** 2) / (2 * P.s1 ** 2) + P.m2 ** 2 / (2 * P.s2 ** 2) + Math.log(P.s2 / P.s1) + Math.log(P.pi / (1 - P.pi));
+    const lo = v => A * v * v + B * v + C0;
+    // top
+    top.innerHTML = ''; const TH = 170, d1 = xs.map(v => P.pi * npdf(v, P.m1, P.s1)), d2 = xs.map(v => (1 - P.pi) * npdf(v, P.m2, P.s2));
+    const ymax = Math.max(...d1, ...d2) * 1.1, TY = lin(0, ymax, TH - m.b, m.t);
+    el('line', { x1: m.l, x2: W - m.r, y1: TY(0), y2: TY(0), class: 'base' }, top);
+    for (let v = -4; v <= 4; v += 2) txt(top, X(v), TH - m.b + 16, v, 'ax', { 'text-anchor': 'middle' });
+    [[d1, '--spam'], [d2, '--ham']].forEach(([d, c]) => el('path', { d: pathOf(xs.map((v, i) => [X(v), TY(d[i])])) + `L${X(5)},${TY(0)}L${X(-5)},${TY(0)}Z`, fill: `var(${c}-soft)`, stroke: `var(${c})`, 'stroke-width': 2 }, top));
+    txt(top, m.l + 4, m.t + 12, 'π₁N(x|μ₁,σ₁²)', 'ax', { fill: 'var(--spam)' }); txt(top, W - m.r - 4, m.t + 12, 'π₂N(x|μ₂,σ₂²)', 'ax', { fill: 'var(--ham)', 'text-anchor': 'end' });
+    // bottom
+    bot.innerHTML = ''; const BH = 190, BY = lin(0, 1, BH - m.b, m.t), L = 10, LY = lin(-L, L, BH - m.b, m.t);
+    [0, .5, 1].forEach(v => { el('line', { x1: m.l, x2: W - m.r, y1: BY(v), y2: BY(v), class: 'grid' }, bot); txt(bot, m.l - 6, BY(v) + 4, v, 'ax', { 'text-anchor': 'end', fill: 'var(--green)' }); });
+    [-10, 0, 10].forEach(v => txt(bot, W - m.r + 6, LY(v) + 4, v, 'ax', { fill: 'var(--mi)' }));
+    for (let v = -4; v <= 4; v += 2) txt(bot, X(v), BH - m.b + 16, v, 'ax', { 'text-anchor': 'middle' });
+    const clip = el('clipPath', { id: 'g1clip' }, el('defs', {}, bot)); el('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: BH - m.t - m.b }, clip);
+    const g = el('g', { 'clip-path': 'url(#g1clip)' }, bot);
+    el('path', { d: pathOf(xs.map(v => [X(v), LY(Math.max(-L * 1.5, Math.min(L * 1.5, lo(v))))])), fill: 'none', stroke: 'var(--mi)', 'stroke-width': 2, 'stroke-dasharray': '6 4' }, g);
+    el('path', { d: pathOf(xs.map(v => [X(v), BY(sigmoid(lo(v)))])), fill: 'none', stroke: 'var(--green)', 'stroke-width': 2.6 }, g);
+    txt(bot, m.l + 4, m.t + 12, 'p(y=1 | x)', 'ax', { fill: 'var(--green)' }); txt(bot, W - m.r - 4, m.t + 12, 'log-odds (right axis)', 'ax', { fill: 'var(--mi)', 'text-anchor': 'end' });
+    // roots
+    let roots = [];
+    if (Math.abs(A) < 1e-9) { if (Math.abs(B) > 1e-12) roots = [-C0 / B]; }
+    else { const disc = B * B - 4 * A * C0; if (disc >= 0) roots = [(-B - Math.sqrt(disc)) / (2 * A), (-B + Math.sqrt(disc)) / (2 * A)]; }
+    roots = roots.filter(r => r > -5 && r < 5);
+    roots.forEach(r => { el('line', { x1: X(r), x2: X(r), y1: m.t, y2: BH - m.b, stroke: 'var(--ink)', 'stroke-dasharray': '2 3' }, bot); el('line', { x1: X(r), x2: X(r), y1: m.t, y2: 170 - m.b, stroke: 'var(--ink)', 'stroke-dasharray': '2 3' }, top); });
+    const sg = v => (v >= 0 ? '+ ' : '− ') + f2(Math.abs(v));
+    $('#g1-chain').innerHTML = `log-odds(x) = <span class="a">${f3(A)}</span>·x² ${sg(B)}·x ${sg(C0)}<br>` +
+      (Math.abs(A) < 1e-9 ? `<span class="ok">σ₁ = σ₂, so the x² term cancels.</span> The log-odds is linear and p(y=1|x) = σ(${f2(B)}·x ${sg(C0)}): logistic regression with one feature.` :
+        `<span class="a">σ₁ ≠ σ₂, so there's an x² term.</span> The log-odds is a parabola, and logistic regression would need the extra feature x² to match it.`) +
+      `<br>decision boundar${roots.length === 1 ? 'y' : 'ies'} (p = ½) in view: ${roots.length ? roots.map(f2).join(', ') : 'none'}`;
+  }
+  render();
+})();
+
+/* =====================================================================
+   9.4.1  Figure 9.8, learning curves, calibration
+   ===================================================================== */
+(function () {
+  const a = $('#f98-a'), b = $('#f98-b'), ws = $('#f98-w'), W = 400, H = 230, m = { l: 34, r: 10, t: 10, b: 26 };
+  const X = lin(0, 1, m.l, W - m.r), xs = []; for (let v = 0; v <= 1.0001; v += 0.0025) xs.push(v);
+  function dens(w) {
+    const raw = xs.map(v => (0.6 * npdf(v, 0.2, 0.07) + 0.4 * npdf(v, 0.42, 0.06)) * (1 + w * 0.85 * Math.sin(2 * Math.PI * v * 14) * Math.exp(-(((v - 0.22) / 0.13) ** 2))));
+    const Z = raw.reduce((s, v) => s + v, 0) * 0.0025; return raw.map(v => v / Z);
+  }
+  const p2 = xs.map(v => npdf(v, 0.72, 0.1));
+  function render() {
+    const w = +ws.value; ws.nextElementSibling.textContent = f2(w);
+    const p1 = dens(w), p10 = dens(0);
+    const ymax = Math.max(...p1, ...p2) * 1.08, Y = lin(0, ymax, H - m.b, m.t);
+    a.innerHTML = '';
+    [0, .2, .4, .6, .8, 1].forEach(v => txt(a, X(v), H - m.b + 16, v, 'ax', { 'text-anchor': 'middle' }));
+    for (let v = 0; v <= ymax; v += 2) { el('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), class: 'grid' }, a); txt(a, m.l - 6, Y(v) + 4, v, 'ax', { 'text-anchor': 'end' }); }
+    el('path', { d: pathOf(xs.map((v, i) => [X(v), Y(p1[i])])), fill: 'none', stroke: 'var(--spam)', 'stroke-width': 2.2 }, a);
+    el('path', { d: pathOf(xs.map((v, i) => [X(v), Y(p2[i])])), fill: 'none', stroke: 'var(--ham)', 'stroke-width': 2.2 }, a);
+    txt(a, X(0.02), m.t + 12, 'p(x|y=1)', 'ax', { fill: 'var(--spam)' }); txt(a, X(0.98), m.t + 12, 'p(x|y=2)', 'ax', { fill: 'var(--ham)', 'text-anchor': 'end' });
+    txt(a, X(0.5), m.t + 12, 'class-conditional densities', 'axl', { 'text-anchor': 'middle' });
+    b.innerHTML = ''; const BY = lin(0, 1.15, H - m.b, m.t);
+    [0, .2, .4, .6, .8, 1].forEach(v => txt(b, X(v), H - m.b + 16, v, 'ax', { 'text-anchor': 'middle' }));
+    [0, .5, 1].forEach(v => { el('line', { x1: m.l, x2: W - m.r, y1: BY(v), y2: BY(v), class: 'grid' }, b); txt(b, m.l - 6, BY(v) + 4, v, 'ax', { 'text-anchor': 'end' }); });
+    const q1 = p1.map((v, i) => v / (v + p2[i])), q10 = p10.map((v, i) => v / (v + p2[i]));
+    el('path', { d: pathOf(xs.map((v, i) => [X(v), BY(q10[i])])), fill: 'none', stroke: 'var(--muted)', 'stroke-width': 5, opacity: .3 }, b);
+    el('path', { d: pathOf(xs.map((v, i) => [X(v), BY(q1[i])])), fill: 'none', stroke: 'var(--spam)', 'stroke-width': 2.2 }, b);
+    el('path', { d: pathOf(xs.map((v, i) => [X(v), BY(1 - q1[i])])), fill: 'none', stroke: 'var(--ham)', 'stroke-width': 2.2 }, b);
+    txt(b, X(0.5), m.t + 12, 'class posteriors (grey = no wiggle)', 'axl', { 'text-anchor': 'middle' });
+    txt(b, X(0.02), BY(1) - 6, 'p(y=1|x)', 'ax', { fill: 'var(--spam)' }); txt(b, X(0.98), BY(1) - 6, 'p(y=2|x)', 'ax', { fill: 'var(--ham)', 'text-anchor': 'end' });
+  }
+  ws.addEventListener('input', render);
+  render();
+})();
+(function () {
+  // 12 features in 6 correlated pairs; within a pair, means differ 4x
+  const Dm = 12, G = 6, DEL = Array.from({ length: G }, (_, g) => 0.45 * (1 + (g % 3)) / 2), NS_ = [8, 16, 32, 64, 128, 256, 512, 1024], R = 16;
+  const mu = d => DEL[d >> 1] * (d & 1 ? 0.25 : 1);
+  function sample(r, n, rho) {
+    const X = [], Y = [], sr = Math.sqrt(rho), sq = Math.sqrt(1 - rho);
+    for (let i = 0; i < n; i++) { const y = i % 2, s = y ? 1 : -1, x = new Float64Array(Dm); for (let g = 0; g < G; g++) { const f = gauss(r); x[2 * g] = s * mu(2 * g) + sr * f + sq * gauss(r); x[2 * g + 1] = s * mu(2 * g + 1) + sr * f + sq * gauss(r); } X.push(x); Y.push(y); }
+    return [X, Y];
+  }
+  // exact error of a linear rule sign(w·x + b) under the true model (classes ±μ, block covariance)
+  function err(w, b, rho) {
+    let wm = 0, v = 0; for (let d = 0; d < Dm; d++) { wm += w[d] * mu(d); v += w[d] * w[d]; }
+    for (let g = 0; g < G; g++) v += 2 * rho * w[2 * g] * w[2 * g + 1];
+    const sd = Math.sqrt(Math.max(v, 1e-12));
+    return 0.5 * Phi(-(wm + b) / sd) + 0.5 * Phi((-wm + b) / sd);
+  }
+  function fitNB(X, Y) {
+    const m = [new Float64Array(Dm), new Float64Array(Dm)], n = [0, 0];
+    X.forEach((x, i) => { n[Y[i]]++; for (let d = 0; d < Dm; d++) m[Y[i]][d] += x[d]; });
+    for (let c = 0; c < 2; c++) for (let d = 0; d < Dm; d++) m[c][d] /= n[c];
+    const v = new Float64Array(Dm); X.forEach((x, i) => { for (let d = 0; d < Dm; d++) v[d] += (x[d] - m[Y[i]][d]) ** 2; });
+    const w = [], pi = n[1] / X.length; let b = Math.log(pi / (1 - pi));
+    for (let d = 0; d < Dm; d++) { const s2 = (v[d] + 2) / (X.length + 2); w.push((m[1][d] - m[0][d]) / s2); b += (m[0][d] ** 2 - m[1][d] ** 2) / (2 * s2); }
+    return [w, b];
+  }
+  function solve(H, g) {
+    const n = g.length, A = H.map((r, i) => [...r, g[i]]);
+    for (let i = 0; i < n; i++) { let p = i; for (let j = i + 1; j < n; j++) if (Math.abs(A[j][i]) > Math.abs(A[p][i])) p = j; [A[i], A[p]] = [A[p], A[i]]; for (let j = 0; j < n; j++) if (j !== i) { const f = A[j][i] / A[i][i]; for (let k = i; k <= n; k++) A[j][k] -= f * A[i][k]; } }
+    return A.map((r, i) => r[n] / r[i]);
+  }
+  function fitLR(X, Y) {
+    const P = Dm + 1, lam = 1e-3; let w = new Array(P).fill(0); const f = new Float64Array(P);
+    for (let it = 0; it < 20; it++) {
+      const g = new Array(P).fill(0), H = Array.from({ length: P }, () => new Array(P).fill(0));
+      for (let i = 0; i < X.length; i++) {
+        f[0] = 1; for (let d = 0; d < Dm; d++) f[d + 1] = X[i][d];
+        let z = 0; for (let a = 0; a < P; a++) z += w[a] * f[a];
+        const p = sigmoid(z), r = p * (1 - p), e = p - Y[i];
+        for (let a = 0; a < P; a++) { g[a] += e * f[a]; const ra = r * f[a]; const Ha = H[a]; for (let c = a; c < P; c++) Ha[c] += ra * f[c]; }
+      }
+      for (let a = 0; a < P; a++) for (let c = 0; c < a; c++) H[a][c] = H[c][a];
+      for (let a = 1; a < P; a++) { g[a] += lam * w[a]; H[a][a] += lam; } H[0][0] += 1e-6;
+      const dlt = solve(H, g); let mx = 0; w = w.map((v, i) => { mx = Math.max(mx, Math.abs(dlt[i])); return v - dlt[i]; });
+      if (mx < 1e-7) break;
+    }
+    return [w.slice(1), w[0]];
+  }
+  function bayesErr(rho) { let D2 = 0; for (let g = 0; g < G; g++) { const a = 2 * DEL[g], u = a, v = a * 0.25; D2 += (u * u - 2 * rho * u * v + v * v) / (1 - rho * rho); } return Phi(-Math.sqrt(D2) / 2); }
+  const cache = {}, svg = $('#lc-plot'), rs = $('#lc-rho');
+  let job = 0;
+  function compute(rho, done) {
+    const key = rho.toFixed(1); if (cache[key] && cache[key].length === NS_.length) return done(cache[key]);
+    const out = cache[key] = [], my = ++job, r = rng(101 + Math.round(rho * 10));
+    let i = 0;
+    (function step() {
+      if (my !== job) { delete cache[key]; return; }
+      const n = NS_[i]; let en = 0, el_ = 0;
+      for (let k = 0; k < R; k++) { const [X, Y] = sample(r, n, rho); const [wn, bn] = fitNB(X, Y); en += err(wn, bn, rho); const [wl, bl] = fitLR(X, Y); el_ += err(wl, bl, rho); }
+      out.push({ n, nb: en / R, lr: el_ / R }); draw(rho, out);
+      if (++i < NS_.length) setTimeout(step, 0); else done(out);
+    })();
+  }
+  const W = 640, H = 280, m = { l: 48, r: 90, t: 12, b: 34 }, X = lin(Math.log2(8), Math.log2(1024), m.l, W - m.r);
+  function draw(rho, out) {
+    svg.innerHTML = '';
+    const be = bayesErr(rho), ymax = Math.max(0.2, Math.ceil(Math.max(be, ...out.map(o => Math.max(o.nb, o.lr))) * 1.1 / 0.05) * 0.05), Y = lin(0, ymax, H - m.b, m.t);
+    for (let v = 0; v <= ymax + 1e-9; v += 0.05) { el('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), class: 'grid' }, svg); txt(svg, m.l - 6, Y(v) + 4, v.toFixed(2), 'ax', { 'text-anchor': 'end' }); }
+    NS_.forEach(n => txt(svg, X(Math.log2(n)), H - m.b + 16, n, 'ax', { 'text-anchor': 'middle' }));
+    txt(svg, (m.l + W - m.r) / 2, H - 4, 'training set size N (log scale)', 'axl', { 'text-anchor': 'middle' });
+    txt(svg, 12, Y(ymax / 2), 'test error', 'axl', { transform: `rotate(-90 12 ${Y(ymax / 2)})`, 'text-anchor': 'middle' });
+    el('line', { x1: m.l, x2: W - m.r, y1: Y(be), y2: Y(be), stroke: 'var(--muted)', 'stroke-dasharray': '5 4' }, svg);
+    txt(svg, W - m.r + 6, Y(be) + 4, 'Bayes ' + f3(be), 'ax');
+    [['nb', '--spam', 'naive Bayes'], ['lr', '--ham', 'logistic reg.']].forEach(([k, c, lab]) => {
+      if (!out.length) return;
+      el('path', { d: pathOf(out.map(o => [X(Math.log2(o.n)), Y(o[k])])), fill: 'none', stroke: `var(${c})`, 'stroke-width': 2.5 }, svg);
+      out.forEach(o => el('circle', { cx: X(Math.log2(o.n)), cy: Y(o[k]), r: 3.5, fill: `var(${c})` }, svg));
+      const last = out[out.length - 1];
+      txt(svg, X(Math.log2(last.n)) + 8, Y(last[k]) + (k === 'nb' ? (last.nb >= last.lr ? -4 : 12) : (last.lr > last.nb ? -4 : 12)), lab, 'lbl', { fill: `var(${c})` });
+    });
+    if (out.length < NS_.length) txt(svg, W - m.r, m.t + 12, `computing… ${out.length}/${NS_.length}`, 'ax', { 'text-anchor': 'end' });
+    else {
+      const nbw = out.filter(o => o.nb < o.lr - 0.003).map(o => o.n), lrw = out.filter(o => o.lr < o.nb - 0.003).map(o => o.n), last = out[out.length - 1];
+      $('#lc-chain').innerHTML = `ρ = ${f2(rho)}: naive Bayes is ahead at N ∈ {${nbw.join(', ') || '—'}}; logistic regression at N ∈ {${lrw.join(', ') || '—'}}.<br>` +
+        `At N = 1024: <span class="s">NB ${f3(last.nb)}</span>, <span class="h">LR ${f3(last.lr)}</span>, best possible ${f3(be)}. ` +
+        (rho === 0 ? `<span class="ok">The NB assumption holds, so both head to the Bayes error, and NB gets there sooner.</span>` : `<span class="a">NB's assumption is wrong, so it levels off above the Bayes error. LR keeps improving.</span>`);
+    }
+  }
+  function go() { const rho = +rs.value; rs.nextElementSibling.textContent = f2(rho); compute(rho, out => draw(rho, out)); }
+  rs.addEventListener('input', () => { rs.nextElementSibling.textContent = f2(+rs.value); });
+  rs.addEventListener('change', go);
+  rs.nextElementSibling.textContent = f2(+rs.value);
+  const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '400px' });
+  io.observe(svg);
+})();
+(function () {
+  const ks = $('#cal-k');
+  function render() {
+    const k = +ks.value; ks.nextElementSibling.textContent = k;
+    const m = model(1), x = [1, 0, 0, 0, 0, 0], s = score(m, x);
+    const v = Math.log(m.th1[0] / m.th0[0]), z1 = Math.log(s.s1 / s.s0), zk = z1 + (k - 1) * v;
+    pbar($('#cal-nb'), sigmoid(zk)); pbar($('#cal-true'), sigmoid(z1));
+    $('#cal-chain').innerHTML = `“free” vote = log(${f3(m.th1[0])} / ${f3(m.th0[0])}) = ${f2(v)}. ` +
+      `NB log-odds = ${f2(z1)} + (${k} − 1) × ${f2(v)} = <span class="s">${f2(zk)}</span>, right log-odds = <span class="ok">${f2(z1)}</span>.<br>` +
+      (k === 1 ? 'One copy: NB is right.' : `The label is the same, but NB is overconfident: it reports ${pct(sigmoid(zk))} instead of ${pct(sigmoid(z1))}.`);
+  }
+  ks.addEventListener('input', render);
+  dataListeners.push(render);
+  render();
+})();
+
+/* =====================================================================
+   9.4.2  Scenario sorter
+   ===================================================================== */
+(function () {
+  const S = [
+    ['You have only 30 labeled examples and need a classifier today.', 'g', 'Naive Bayes needs very little data to reach its best accuracy (the learning curves in §9.4.1), and fitting is just counting.'],
+    ['You have millions of labeled examples and care only about accuracy.', 'd', 'With lots of data, discriminative models usually win, because they don\'t spend effort modeling p(x) (§9.4.1).'],
+    ['At test time, some sensors fail and their readings are missing.', 'g', 'A generative model marginalizes missing features out. Under NB that means just skipping their factors (§9.4.3).'],
+    ['New product categories are added every week.', 'g', 'Generative classifiers fit each class separately, so a new class means fitting only that class (§9.4.2).'],
+    ['You want to feed in word embeddings and polynomial features.', 'd', 'Discriminative models allow arbitrary preprocessing. Modeling p(x|y) for such correlated features is hard (§9.4.1).'],
+    ['Probabilities feed directly into insurance prices, so they must be well calibrated.', 'd', 'NB\'s independence assumption makes its probabilities extreme. Discriminative models are usually better calibrated (§9.4.1).'],
+    ['You have 100 labeled emails and 1,000,000 unlabeled ones.', 'g', 'Generative models can use unlabeled data by treating the label as hidden and running EM (§9.4.2).'],
+    ['In training, every photo of a cow happens to be on grass.', 'g', 'A discriminative model may latch onto the spurious "grass" feature. A generative model of what cows look like may be more robust (§9.4.2).']
+  ];
+  const box = $('#scen'); SCORE.total += S.length;
+  box.innerHTML = S.map(([q], i) => `<div class="sc" data-i="${i}"><p>${q}</p><div class="btns" style="margin-top:0"><button class="b" data-a="g" style="border-color:var(--spam);color:var(--spam)">Generative</button><button class="b" data-a="d" style="border-color:var(--ham);color:var(--ham)">Discriminative</button></div></div>`).join('');
+  box.addEventListener('click', e => {
+    const b = e.target.closest('[data-a]'); if (!b || b.disabled) return;
+    const card = b.closest('.sc'), [, a, w] = S[+card.dataset.i], ok = b.dataset.a === a;
+    $$('[data-a]', card).forEach(x => { x.disabled = true; if (x.dataset.a === a) x.classList.add('pri'); });
+    card.insertAdjacentHTML('beforeend', `<p class="why-ans"><b class="${ok ? 'ok' : 'no'}">${ok ? 'Correct.' : 'Not quite.'}</b> ${a === 'g' ? 'Generative' : 'Discriminative'}. ${w}</p>`);
+    if (ok) SCORE.right++; SCORE.paint();
+  });
+})();
+
+/* =====================================================================
+   9.4.3  Missing features
+   ===================================================================== */
+(function () {
+  const x = [1, null, 0, 1, null, 0];
+  wordChips($('#ms-words'), x, { tri: true, onchange: render });
+  function render() {
+    const m = model(1), s = score(m, x), s0 = score(m, x.map(v => v === null ? 0 : v));
+    let h = `<thead><tr><th>word</th><th>state</th><th>spam factor</th><th>ham factor</th></tr></thead><tbody><tr><td>prior</td><td></td><td class="s">${f3(m.pi1)}</td><td class="h">${f3(1 - m.pi1)}</td></tr>`;
+    WORDS.forEach((w, d) => {
+      const v = x[d];
+      h += v === null ? `<tr><td>${w}</td><td class="a">? unknown</td><td class="a">${f3(m.th1[d])} + ${f3(1 - m.th1[d])} = 1</td><td class="a">${f3(m.th0[d])} + ${f3(1 - m.th0[d])} = 1</td></tr>`
+        : `<tr><td>${w}</td><td>${v ? 'present' : 'absent'}</td><td class="s">${f3(s.f1[d])}</td><td class="h">${f3(s.f0[d])}</td></tr>`;
+    });
+    h += `<tr class="tot"><td>score</td><td></td><td class="s">${sci(s.s1)}</td><td class="h">${sci(s.s0)}</td></tr></tbody>`;
+    $('#ms-table').innerHTML = h;
+    pbar($('#ms-bar'), s.p); pbar($('#ms-bar0'), s0.p);
+  }
+  dataListeners.push(render);
+  render();
+})();
+(function () {
+  const { W, H, P, test, logpost, drawImg, postBars } = DG, on = new Array(10).fill(true), hs = $('#oc-h');
+  let idx = 8; const rr = rng(77);
+  const accCache = {};
+  function acc(h) {
+    if (accCache[h]) return accCache[h];
+    const vis = Array.from({ length: P }, (_, p) => Math.floor(p / W) < H - h);
+    let am = 0, af = 0;
+    test.forEach(t => { if (logpost(t.x, on, vis).top === t.c) am++; if (logpost(t.x.map((v, p) => vis[p] ? v : 0), on).top === t.c) af++; });
+    return accCache[h] = [am / test.length, af / test.length];
+  }
+  function render() {
+    const h = +hs.value; hs.nextElementSibling.textContent = h;
+    const t = test[idx], vis = Array.from({ length: P }, (_, p) => Math.floor(p / W) < H - h);
+    const svg = $('#oc-img');
+    drawImg(svg, t.x, { grid: true, gap: 1, opacity: p => vis[p] ? t.x[p] : 0 });
+    if (h) {
+      const defs = el('defs', {}, svg), pat = el('pattern', { id: 'hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+      el('rect', { width: 6, height: 6, fill: 'var(--gap-soft)' }, pat); el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: 'var(--gap)', 'stroke-width': 2 }, pat);
+      el('rect', { x: 0, y: (H - h) * 20, width: W * 20, height: h * 20, fill: 'url(#hatch)', stroke: 'var(--gap)' }, svg);
+      txt(svg, W * 10, (H - h / 2) * 20 + 4, 'hidden', 'lbl', { 'text-anchor': 'middle', fill: 'var(--gap)' });
+    }
+    const rm = logpost(t.x, on, vis), rf = logpost(t.x.map((v, p) => vis[p] ? v : 0), on);
+    postBars($('#oc-marg'), rm.post); postBars($('#oc-fill'), rf.post);
+    $('#oc-true').innerHTML = `true label <b>${t.c}</b> · marginalize says <b style="color:${rm.top === t.c ? 'var(--green)' : 'var(--spam)'}">${rm.top}</b> · fill-with-0 says <b style="color:${rf.top === t.c ? 'var(--green)' : 'var(--spam)'}">${rf.top}</b>`;
+    const [am, af] = acc(h);
+    $('#oc-am').textContent = pct(am); $('#oc-af').textContent = pct(af);
+  }
+  hs.addEventListener('input', render);
+  $('#oc-new').addEventListener('click', () => { idx = Math.floor(rr() * test.length); render(); });
+  render();
+})();
+
+/* ---------- Quizzes ---------- */
+const QUIZ = {
+  nb: [
+    { l: 'Kid', q: 'Why is the detective called "naive"?', o: ['She\'s new at the job', 'She pretends the clues have nothing to do with each other', 'She always picks junk', 'She ignores the clues'], a: 1, w: 'She scores each clue on its own, as if clues never come in groups. Real clues often do.' },
+    { l: 'HS', q: 'P(spam) = 0.5. "free" appears in 80% of spam and 10% of ham. Using only that word, P(spam | "free") ≈ …', o: ['0.80', '0.89', '0.50', '0.10'], a: 1, w: '0.5 × 0.8 / (0.5 × 0.8 + 0.5 × 0.1) = 0.40 / 0.45 ≈ 0.89.' },
+    { l: 'Undergrad', q: 'The naive Bayes assumption is that…', o: ['all features are independent', 'features are independent given the class label', 'the class is independent of the features', 'every feature is Gaussian'], a: 1, w: 'Conditional independence. "free" and "winner" are correlated overall (both are common in spam), but NB assumes that within spam, one tells you nothing extra about the other.' },
+    { l: 'Undergrad', q: 'In Bernoulli NB, what factor does an absent word contribute for class c?', o: ['1 (it\'s ignored)', 'θ_dc', '1 − θ_dc', '0'], a: 2, w: 'θ^x (1−θ)^(1−x) with x = 0 gives 1 − θ. Absence is evidence too: "no meeting" nudges toward spam in the demo.' },
+    { l: 'Grad', q: 'Why can NB classify well even when its assumption is badly violated?', o: ['Its probabilities are well calibrated', '0-1 loss only needs the argmax right; double-counted evidence often inflates the log-odds without flipping its sign', 'Correlations cancel out exactly', 'It is the Bayes-optimal classifier'], a: 1, w: 'Domingos & Pazzani (1997). The ranking survives while the probabilities become extreme, which is the calibration problem in §9.4.1.' }
+  ],
+  models: [
+    { l: 'Kid', q: 'In the digit pictures that show θ, a dark square means…', o: ['That square is usually colored in for that number', 'The computer is broken', 'That square is never colored in', 'That number is rare'], a: 0, w: 'Each picture shows, square by square, how often that square was colored in the training examples of that digit.' },
+    { l: 'HS', q: 'In 2-D, Gaussian naive Bayes draws each class as an ellipse that…', o: ['can tilt any way', 'is always a circle', 'lines up with the x and y axes', 'is the same for every class'], a: 2, w: 'Treating x₁ and x₂ as independent means no correlation, so no tilt. It can still be wide or tall, and differ between classes.' },
+    { l: 'Undergrad', q: 'Gaussian naive Bayes is equivalent to…', o: ['logistic regression', 'Gaussian discriminant analysis with diagonal class covariances', 'k-nearest neighbors', 'LDA with a full shared covariance'], a: 1, w: 'Π_d N(x_d | μ_dc, σ²_dc) = N(x | μ_c, diag(σ²_c)).' },
+    { l: 'Undergrad', q: 'How many parameters does Bernoulli NB have for 10 classes and 784 binary pixels, counting the prior?', o: ['784', '7,840 + 9', '10 × 2^784', '784 + 10'], a: 1, w: 'One θ per pixel per class (7,840), plus 9 free prior probabilities (they sum to 1).' },
+    { l: 'Grad', q: 'For text, which event model ignores words that are absent from a document?', o: ['Multivariate Bernoulli', 'Multinomial', 'Both', 'Neither'], a: 1, w: 'The multinomial model is a product over word occurrences, so absent words contribute nothing. Bernoulli multiplies in (1 − θ) for every absent vocabulary word.' }
+  ],
+  fit: [
+    { l: 'Kid', q: 'How does naive Bayes "learn" a clue?', o: ['By guessing and checking many times', 'By counting how often it shows up in each box', 'By asking a teacher', 'By flipping a coin'], a: 1, w: 'Learning is tallying: in how many junk letters did this word appear?' },
+    { l: 'HS', q: '8 of 20 spam emails contain "click". The MLE of θ_click,spam is…', o: ['0.08', '0.4', '0.8', '8'], a: 1, w: 'N_dc / N_c = 8 / 20 = 0.4.' },
+    { l: 'Undergrad', q: 'Why can each θ_dc be fit separately?', o: ['They\'re all equal', 'The log-likelihood is a sum of terms that each involve only one θ_dc (Eq. 9.51)', 'Because of the prior', 'Because the features are binary'], a: 1, w: 'Logs turn the product into a sum, and grouping by (d, c) gives 1 + CD independent pieces.' },
+    { l: 'Undergrad', q: 'The Gaussian MLE σ̂²_dc divides by…', o: ['N', 'N_c − 1', 'N_c', 'D'], a: 2, w: 'Eq. 9.55. It\'s the biased variance over the class-c examples; dividing by N_c − 1 would be the unbiased estimate, which is not the MLE.' },
+    { l: 'Grad', q: 'A word never appears in ham training emails. Using the MLE, what happens to a test email that contains it?', o: ['p(ham | x) = 0 no matter what else it says', 'The word is ignored', 'p(ham | x) = 0.5', 'Training fails with an error'], a: 0, w: 'θ̂ = 0 puts a factor of 0 into ham\'s product. That\'s the zero-count problem, and §9.3.3 fixes it.' }
+  ],
+  bayes: [
+    { l: 'Kid', q: 'Why pretend you\'ve already seen a junk letter with every word in it?', o: ['To make the counts bigger for fun', 'So no word is ever treated as impossible', 'To trick spammers', 'So every letter counts as junk'], a: 1, w: 'With only a few real letters, never seeing a word doesn\'t prove it can\'t happen.' },
+    { l: 'HS', q: 'With add-one smoothing, a word seen in 0 of 5 spam emails gets θ =', o: ['0', '1/7', '1/5', '1/2'], a: 1, w: '(0 + 1) / (5 + 2) = 1/7. The +2 is because there are two outcomes, present and absent.' },
+    { l: 'Undergrad', q: 'The Dirichlet is the conjugate prior for the categorical. This means…', o: ['the posterior is also Dirichlet, with the counts added to the prior\'s β', 'the posterior is Gaussian', 'the prior doesn\'t matter', 'the MLE always equals the posterior mean'], a: 0, w: 'Prior ∝ Πθ^(β−1), likelihood ∝ Πθ^N. Multiply and the exponents add: Dir(β + N).' },
+    { l: 'Undergrad', q: 'As N_c → ∞ with β̆ fixed, the posterior mean θ̄_dc…', o: ['goes to 1/2', 'goes to the MLE N_dc1 / N_c', 'goes to 0', 'stays at β̆'], a: 1, w: '(β̆ + N_dc1) / (2β̆ + N_c): the pseudo-counts become negligible.' },
+    { l: 'Grad', q: 'Why is "plug in the posterior mean" the exact posterior predictive for one new x here?', o: ['The posterior is a point mass', 'The predictive is a product of distinct, a-posteriori independent parameters, each to the first power, so E[Πθ] = ΠE[θ]', 'Because β̆ = 1', 'It is only an approximation'], a: 1, w: 'For a single test point, each θ_dck appears at most once, and the posterior factorizes. For several test points jointly this breaks.' }
+  ],
+  lr: [
+    { l: 'Kid', q: 'In the points game, how does naive Bayes decide how many points a clue is worth?', o: ['By counting how often it shows up in each box', 'By trying random numbers', 'Every clue is worth 1 point', 'By asking the letter writer'], a: 0, w: 'Logistic regression adjusts the points by trial and improvement; NB just counts.' },
+    { l: 'HS', q: 'Why does taking the log turn naive Bayes\'s product into a sum?', o: ['log(a × b) = log a + log b', 'log is always positive', 'log makes numbers smaller', 'log(a + b) = log a × log b'], a: 0, w: 'That one rule turns "prior × factor × factor…" into "log prior + vote + vote…".' },
+    { l: 'Undergrad', q: 'One Gaussian feature, two classes. When is p(y=1 | x) a logistic sigmoid of a linear function of x?', o: ['Always', 'When σ₁ = σ₂', 'When μ₁ = μ₂', 'When π₁ = 0.5'], a: 1, w: 'The x² coefficient of the log-odds is −1/(2σ₁²) + 1/(2σ₂²), which is zero only when the variances match.' },
+    { l: 'Undergrad', q: 'NB and logistic regression have the same functional form. What differs?', o: ['NB maximizes the joint likelihood Π p(yₙ, xₙ), LR the conditional Π p(yₙ | xₙ)', 'NB is nonlinear', 'LR can\'t use binary features', 'Nothing; they always give the same weights'], a: 0, w: 'Same hypothesis class, different objectives, so in general different weights.' },
+    { l: 'Grad', q: 'For binary features and two classes, NB\'s implied LR weight for feature d is…', o: ['log(θ_d1 / θ_d0)', 'log[θ_d1(1−θ_d0) / (θ_d0(1−θ_d1))]', 'θ_d1 − θ_d0', 'log(π₁ / π₀)'], a: 1, w: 'Present minus absent: log(θ_d1/θ_d0) − log((1−θ_d1)/(1−θ_d0)). The absent part goes into the bias w₀.' }
+  ],
+  gvd: [
+    { l: 'Kid', q: 'The kid who learns to draw cats and dogs is like a…', o: ['discriminative classifier', 'generative classifier', 'calculator', 'random guesser'], a: 1, w: 'She models what each class looks like, p(x | y), so she could make new examples.' },
+    { l: 'HS', q: 'In the calibration demo, why does NB get more confident as copies of "free" are added?', o: ['The email really is more likely to be spam', 'Each copy multiplies in the same evidence again, as if it were new', 'The prior changes', 'Smoothing stops working'], a: 1, w: 'The copies carry no new information, but NB can\'t tell, because it assumes features are independent given the class.' },
+    { l: 'Undergrad', q: 'In the learning-curve demo at ρ = 0.5, the pattern is…', o: ['LR is better at every N', 'NB is better at small N, LR at large N', 'NB is better at large N', 'They\'re identical'], a: 1, w: 'NB reaches its (worse) asymptote quickly. LR starts slower but converges to a lower error.' },
+    { l: 'Undergrad', q: 'Why is it hard to build a generative model on polynomial features (x, x², x³)?', o: ['They are too large', 'The new features are deterministically related, and p(x | y) would have to capture that', 'Polynomials aren\'t differentiable', 'They make the prior improper'], a: 1, w: 'A discriminative model just conditions on them. A generative model has to describe their joint distribution.' },
+    { l: 'Grad', q: 'Ng & Jordan (2002): NB approaches its asymptotic error with O(?) samples, LR with O(?).', o: ['O(log D) and O(D)', 'O(D) and O(log D)', 'O(D²) and O(D)', 'Both O(D)'], a: 0, w: 'Hence the crossover when NB is misspecified: NB is faster, LR is better in the limit.' }
+  ],
+  gen: [
+    { l: 'Kid', q: 'A rabbit shows up. What does the drawing kid have to do?', o: ['Relearn everything', 'Just learn to draw rabbits', 'Redo her cat drawings', 'Nothing, she already knows rabbits'], a: 1, w: 'Her cat and dog drawings don\'t change. Generative models fit each class separately.' },
+    { l: 'HS', q: 'Which is NOT an advantage of generative classifiers listed in §9.4.2?', o: ['Easy to fit', 'Handles missing features', 'Better-calibrated probabilities', 'Can use unlabeled data'], a: 2, w: 'Calibration is listed as an advantage of discriminative classifiers (§9.4.1).' },
+    { l: 'Undergrad', q: 'Why doesn\'t adding a new class require refitting the old classes\' θ in NB?', o: ['The joint log-likelihood decouples by class, so only π and the new class\'s θ change', 'The old classes are frozen by convention', 'Softmax normalizes automatically', 'Because the features are binary'], a: 0, w: 'Eq. 9.51. In softmax regression, the log-sum-exp normalizer couples every class\'s weights.' },
+    { l: 'Undergrad', q: 'How can a generative classifier use unlabeled x?', o: ['It can\'t', 'Treat the label as hidden and maximize log Σ_c p(x, y=c) with EM', 'Throw it away', 'Label it at random'], a: 1, w: 'Unlabeled points contribute a mixture-model term to the likelihood. EM (§8.7) handles it.' },
+    { l: 'Grad', q: 'Adding unlabeled data via EM can hurt a generative classifier when…', o: ['N is large', 'The generative model is misspecified', 'The classes are balanced', 'The features are binary'], a: 1, w: 'EM then pulls the parameters toward explaining p(x) better, not toward a better decision boundary (Cozman & Cohen 2003).' }
+  ],
+  missing: [
+    { l: 'Kid', q: 'The letter is torn and you can\'t see whether it said "FREE." What does the detective do?', o: ['Pretend it didn\'t say FREE', 'Pretend it did', 'Skip that clue and use the others', 'Throw the letter away'], a: 2, w: 'Guessing either way adds evidence she doesn\'t have.' },
+    { l: 'HS', q: 'For a missing binary word, the factor becomes θ + (1 − θ). That equals…', o: ['θ', '0', '1', '2θ'], a: 2, w: 'Multiplying by 1 changes nothing, so the word drops out.' },
+    { l: 'Undergrad', q: 'Why does Σ over x₁ of p(x₁, x₂:D | c) simplify so nicely under NB?', o: ['The factors for x₂:D don\'t involve x₁, so they come out of the sum, and Σ p(x₁ | θ₁c) = 1', 'x₁ is always 0', 'Because of smoothing', 'Because the classes are balanced'], a: 0, w: 'Eq. 9.65.' },
+    { l: 'Undergrad', q: 'Filling a missing word in as "absent" is wrong because…', o: ['It adds a factor (1 − θ_dc) that differs by class, which is evidence you don\'t have', 'It\'s slower', 'It changes the prior', 'It\'s actually the same as marginalizing'], a: 0, w: 'The occlusion demo shows the accuracy cost: treating hidden pixels as white is a confident, wrong observation.' },
+    { l: 'Grad', q: 'Simply marginalizing is valid only if the missingness is…', o: ['missing not at random', 'missing at random (not informative about the value)', 'correlated with the class', 'always on the first feature'], a: 1, w: 'If missingness depends on the hidden value, model it, e.g. add a missingness indicator with its own p(m | y).' }
+  ]
+};
+(function () {
+  $$('[data-quiz]').forEach(box => {
+    const qs = QUIZ[box.dataset.quiz]; SCORE.total += qs.length;
+    let local = 0;
+    function build() {
+      box.innerHTML = qs.map((q, i) => `<div class="qq" data-i="${i}"><p class="qt"><span class="qn">Q${i + 1}</span>${q.q}<span class="ql">${q.l}</span></p><div class="opts">${q.o.map((o, j) => `<button class="opt" data-j="${j}">${o}</button>`).join('')}</div></div>`).join('') +
+        `<div class="quizfoot"><span class="qs">0 / ${qs.length} correct</span><button class="b qreset">Reset these questions</button></div>`;
+    }
+    build();
+    box.addEventListener('click', e => {
+      if (e.target.closest('.qreset')) { SCORE.right -= local; local = 0; build(); SCORE.paint(); return; }
+      const b = e.target.closest('.opt'); if (!b || b.disabled) return;
+      const card = b.closest('.qq'), q = qs[+card.dataset.i], ok = +b.dataset.j === q.a;
+      $$('.opt', card).forEach((x, k) => { x.disabled = true; if (k === q.a) x.classList.add('right'); });
+      if (!ok) b.classList.add('wrong');
+      card.insertAdjacentHTML('beforeend', `<p class="why-ans"><b class="${ok ? 'ok' : 'no'}">${ok ? 'Correct.' : 'Not quite.'}</b> ${q.w}</p>`);
+      if (ok) { local++; SCORE.right++; }
+      $('.qs', box).textContent = `${local} / ${qs.length} correct`;
+      SCORE.paint();
+    });
+  });
+  SCORE.paint();
+})();
+
+/* ---------- Rail highlight + theme changes ---------- */
+(function () {
+  const links = $$('#rail a'), secs = links.map(a => $(a.getAttribute('href')));
+  const io = new IntersectionObserver(es => {
+    es.forEach(e => { if (e.isIntersecting) links.forEach(l => l.classList.toggle('on', l.getAttribute('href') === '#' + e.target.id)); });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  secs.forEach(s => s && io.observe(s));
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => renderers.forEach(f => f()));
+})();
+})();
+</script>
+
+</body>
+</html>
